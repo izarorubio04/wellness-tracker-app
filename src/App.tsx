@@ -1,26 +1,46 @@
-// src/App.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PlayerHome } from './components/PlayerHome';
 import { DailyWellness, WellnessData } from './components/DailyWellness';
 import { RPEForm } from './components/RPEForm';
 import { StaffDashboard } from './components/StaffDashboard';
-import { Users } from 'lucide-react';
-// Importamos la conexión a la base de datos y la función para añadir documentos
+import { Login } from './components/Login'; // <--- IMPORTAMOS EL NUEVO LOGIN
+import { Users, LogOut } from 'lucide-react';
 import { db } from './firebase';
 import { collection, addDoc } from 'firebase/firestore';
-// Importamos el "toast" (notificación bonita) de la librería que ya tienes instalada
 import { Toaster, toast } from 'sonner';
 
 type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<string | null>(null); // Estado para el usuario
   const [currentScreen, setCurrentScreen] = useState<Screen>('player-home');
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
 
+  // EFECTO: Al arrancar, comprobamos si ya habías iniciado sesión antes
+  useEffect(() => {
+    const savedUser = localStorage.getItem('alaves_user');
+    if (savedUser) {
+      setCurrentUser(savedUser);
+    }
+  }, []);
+
+  const handleLogin = (name: string) => {
+    setCurrentUser(name);
+    localStorage.setItem('alaves_user', name); // Guardamos en la memoria del teléfono
+    toast.success(`Hola, ${name}`);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('alaves_user');
+    setCurrentScreen('player-home');
+  };
+
   const handleWellnessSubmit = async (data: WellnessData) => {
+    if (!currentUser) return; // Seguridad extra
+
     try {
-      // 1. Calculamos el readiness (tu fórmula)
       const readiness = (
         data.sleepQuality * 0.25 +
         (10 - data.fatigueLevel) * 0.25 +
@@ -29,32 +49,32 @@ export default function App() {
         data.mood * 0.15
       );
 
-      // 2. GUARDAMOS EN FIREBASE (Aquí ocurre la magia)
       await addDoc(collection(db, "wellness_logs"), {
         ...data,
         readinessScore: readiness,
-        playerName: "Jugadora Prueba", // Más adelante pondremos el nombre real del login
+        playerName: currentUser, // <--- AQUI USAMOS EL NOMBRE REAL
         date: new Date(),
         timestamp: Date.now()
       });
 
-      // 3. Feedback visual
       setWellnessCompleted(true);
       setWeeklyReadiness(readiness);
-      toast.success("¡Datos guardados correctamente!"); // Notificación verde
+      toast.success("¡Wellness guardado!");
       
     } catch (error) {
       console.error("Error guardando:", error);
-      toast.error("Error al guardar los datos");
+      toast.error("Error al guardar");
     }
   };
 
   const handleRPESubmit = async (rpe: number, notes: string) => {
+    if (!currentUser) return;
+
     try {
       await addDoc(collection(db, "rpe_logs"), {
         rpeValue: rpe,
         notes: notes,
-        playerName: "Jugadora Prueba",
+        playerName: currentUser, // <--- AQUI USAMOS EL NOMBRE REAL
         date: new Date(),
         timestamp: Date.now()
       });
@@ -65,31 +85,45 @@ export default function App() {
     }
   };
 
+  // SI NO HAY USUARIO, MOSTRAMOS LOGIN
+  if (!currentUser) {
+    return (
+      <>
+        <Toaster position="top-center" />
+        <Login onLogin={handleLogin} />
+      </>
+    );
+  }
+
+  // SI HAY USUARIO, MOSTRAMOS LA APP NORMAL
   return (
     <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
-      {/* Componente para las notificaciones */}
       <Toaster position="top-center" />
 
-      {/* Role Toggle Button */}
-      <button
-        onClick={() => setCurrentScreen(currentScreen === 'staff' ? 'player-home' : 'staff')}
-        className="fixed top-6 right-6 z-50 w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform border-2 border-[#0B2149]"
-        style={{ 
-          backgroundColor: currentScreen === 'staff' ? '#0B2149' : '#FFFFFF' 
-        }}
-      >
-        <Users 
-          className="w-6 h-6" 
-          style={{ 
-            color: currentScreen === 'staff' ? '#FFFFFF' : '#0B2149' 
-          }} 
-        />
-      </button>
+      {/* Botón flotante para cambiar Rol o Salir */}
+      <div className="fixed top-6 right-6 z-50 flex flex-col gap-2">
+        <button
+          onClick={() => setCurrentScreen(currentScreen === 'staff' ? 'player-home' : 'staff')}
+          className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center active:scale-95 border-2 border-[#0B2149]"
+          style={{ backgroundColor: currentScreen === 'staff' ? '#0B2149' : '#FFFFFF' }}
+        >
+          <Users className="w-5 h-5" style={{ color: currentScreen === 'staff' ? '#FFFFFF' : '#0B2149' }} />
+        </button>
+        
+        {/* Pequeño botón de Logout (opcional, por si te equivocas de nombre) */}
+        {currentScreen === 'player-home' && (
+           <button
+             onClick={handleLogout}
+             className="w-12 h-12 bg-red-100 rounded-full shadow-lg flex items-center justify-center active:scale-95 border-2 border-red-200"
+           >
+             <LogOut className="w-5 h-5 text-red-500" />
+           </button>
+        )}
+      </div>
 
-      {/* Screen Router */}
       {currentScreen === 'player-home' && (
         <PlayerHome
-          playerName="Ana"
+          playerName={currentUser} // <--- Pasamos el nombre al saludo
           onNavigate={setCurrentScreen}
           wellnessCompleted={wellnessCompleted}
           weeklyReadiness={weeklyReadiness}
