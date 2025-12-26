@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@layer theme {
+  :root {
+    /* Alavés Deep Blue Theme */
+    --color-primary: #0B2149;
+    --color-primary-dark: #071533;
+    --color-primary-light: #1a3a6b;
+    
+    /* Status Colors */
+    --color-success: #10B981;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    
+    /* Neutral Colors */
+    --color-background: #F8FAFC;
+    --color-surface: #FFFFFF;
+    --color-text: #0F172A;
+    --color-text-secondary: #64748B;
+    --color-border: #E2E8F0;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+* {
+  box-sizing: border-box;
+}
