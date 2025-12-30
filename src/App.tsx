@@ -4,7 +4,7 @@ import { DailyWellness, WellnessData } from './components/DailyWellness';
 import { RPEForm } from './components/RPEForm';
 import { StaffDashboard } from './components/StaffDashboard';
 import { Login } from './components/Login';
-import { LogOut } from 'lucide-react'; // Quitamos el icono Users porque ya no hace falta cambiar vista
+import { LogOut } from 'lucide-react';
 import { db } from './firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
@@ -27,7 +27,6 @@ export default function App() {
     if (savedUser && savedRole) {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
-      // REGLA DE ORO: Si es Staff, SIEMPRE va a 'staff'. Si es Player, a 'player-home'
       setCurrentScreen(savedRole === 'staff' ? 'staff' : 'player-home');
     }
   }, []);
@@ -38,7 +37,6 @@ export default function App() {
     localStorage.setItem('alaves_user', name);
     localStorage.setItem('alaves_role', role);
     
-    // REGLA DE ORO AL LOGUEARSE
     setCurrentScreen(role === 'staff' ? 'staff' : 'player-home');
     toast.success(`Hola, ${name}`);
   };
@@ -106,29 +104,17 @@ export default function App() {
   }
 
   // --- RENDERIZADO PARA STAFF ---
-  // El staff ve SOLAMENTE el dashboard y el botón de salir.
+  // Ahora es mucho más limpio: Solo el Dashboard con la función de salir
   if (userRole === 'staff') {
     return (
       <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
         <Toaster position="top-center" />
-        
-        {/* Botón Salir Flotante */}
-        <div className="fixed bottom-6 right-6 z-50">
-           <button
-             onClick={handleLogout}
-             className="w-14 h-14 bg-white rounded-full shadow-xl flex items-center justify-center active:scale-95 border border-red-100 text-red-500"
-           >
-             <LogOut className="w-6 h-6" />
-           </button>
-        </div>
-
-        <StaffDashboard />
+        <StaffDashboard onLogout={handleLogout} />
       </div>
     );
   }
 
   // --- RENDERIZADO PARA JUGADORA ---
-  // La jugadora ve su Home y navegación normal
   return (
     <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
       <Toaster position="top-center" />

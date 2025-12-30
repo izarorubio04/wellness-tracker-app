@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   AlertTriangle,
-  ArrowLeft,
+  LogOut, // <--- CAMBIO: Icono de LogOut en vez de ArrowLeft
   Moon,
   Zap,
   Activity,
@@ -12,6 +12,7 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   MessageSquare,
+  Edit2,
 } from "lucide-react";
 import {
   Tabs,
@@ -36,10 +37,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
 
-// IMPORTAR FIREBASE
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface Player {
   id: string;
@@ -65,21 +76,39 @@ interface Player {
   };
 }
 
+// CAMBIO: Ahora recibimos onLogout en lugar de onBack
 interface StaffDashboardProps {
-  onBack: () => void;
+  onLogout: () => void;
 }
 
-export function StaffDashboard({ onBack }: StaffDashboardProps) {
+export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   const [activeTab, setActiveTab] = useState("morning");
   const [selectedDate, setSelectedDate] = useState(new Date());
   
   const [currentPlayers, setCurrentPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // --- LÓGICA DE FIREBASE ---
+  const [plannedRpe, setPlannedRpe] = useState(5.0);
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState("5");
+
+  const getDateKey = (date: Date) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
+      const dateKey = getDateKey(selectedDate);
+      
+      const targetDocRef = doc(db, "rpe_targets", dateKey);
+      const targetSnap = await getDoc(targetDocRef);
+      if (targetSnap.exists()) {
+        setPlannedRpe(targetSnap.data().target);
+      } else {
+        setPlannedRpe(5.0);
+      }
+
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -165,8 +194,20 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
     fetchData();
   }, [selectedDate]);
 
+  const handleSaveTarget = async () => {
+    const val = parseFloat(tempTarget);
+    if (isNaN(val) || val < 0 || val > 10) return;
 
-  // --- HELPERS VISUALES ---
+    try {
+      const dateKey = getDateKey(selectedDate);
+      await setDoc(doc(db, "rpe_targets", dateKey), { target: val });
+      setPlannedRpe(val);
+      setIsEditingTarget(false);
+    } catch (e) {
+      console.error("Error guardando objetivo:", e);
+    }
+  };
+
   const formatDateLabel = (date: Date) => {
     const today = new Date();
     const isToday =
@@ -219,7 +260,7 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
           ) / rpeResponses
         ).toFixed(1)
       : "0.0";
-  const plannedRpe = 5.0;
+  
   const totalPlayers = currentPlayers.length;
   const completedCount =
     activeTab === "morning"
@@ -321,11 +362,13 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
       <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-8 text-white shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
+            {/* CAMBIO: BOTÓN DE LOGOUT AQUI */}
             <button
-              onClick={onBack}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors active:scale-95"
+              onClick={onLogout}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 hover:text-white transition-colors active:scale-95"
+              title="Cerrar Sesión"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <LogOut className="w-5 h-5" />
             </button>
 
             <DropdownMenu>
@@ -338,7 +381,6 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
                   <ChevronDown className="w-4 h-4 opacity-50" />
                 </div>
               </DropdownMenuTrigger>
-              {/* CORRECCIÓN VISUAL: Forzamos fondo blanco, texto oscuro y bordes */}
               <DropdownMenuContent
                 align="start"
                 className="w-56 bg-white text-slate-900 border border-slate-200 shadow-lg z-50 p-1"
@@ -397,7 +439,6 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
                 </div>
               </button>
             </SheetTrigger>
-            {/* CORRECCIÓN VISUAL: Forzamos fondo blanco y texto oscuro en el Sheet */}
             <SheetContent className="w-[90%] sm:w-[400px] bg-white text-slate-900 border-l border-slate-200 z-50">
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-[#0B2149] text-xl">
@@ -430,9 +471,7 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
             </TabsTrigger>
           </TabsList>
 
-          {/* --- PESTAÑA 1: WELLNESS --- */}
           <TabsContent value="morning" className="space-y-4 mt-4 animate-in slide-in-from-bottom-2 duration-500">
-            
             {currentPlayers.length === 0 && !loading && (
                 <div className="text-center py-10 text-slate-400 text-sm">
                     No hay registros para este día.
@@ -515,7 +554,6 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
             </div>
           </TabsContent>
 
-          {/* --- PESTAÑA 2: SESSION RPE --- */}
           <TabsContent value="session" className="space-y-6 mt-4 animate-in slide-in-from-bottom-2 duration-500">
             <Card className="bg-white shadow-sm border-none overflow-hidden relative">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
@@ -530,10 +568,50 @@ export function StaffDashboard({ onBack }: StaffDashboardProps) {
             </Card>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-center">
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-center relative">
+                
+                <Dialog open={isEditingTarget} onOpenChange={setIsEditingTarget}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute top-2 right-2 h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-100"
+                      onClick={() => setTempTarget(plannedRpe.toString())}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white text-slate-900 border-slate-200">
+                    <DialogHeader>
+                      <DialogTitle>Objetivo RPE</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="target">RPE Esperado (0-10)</Label>
+                        <Input
+                          id="target"
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={tempTarget}
+                          onChange={(e) => setTempTarget(e.target.value)}
+                          className="text-center text-lg font-bold"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Esto ajustará la alerta de "Más duro de lo previsto" para todas las jugadoras en este día.
+                      </p>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleSaveTarget} className="bg-[#0B2149] text-white">Guardar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 <div className="text-xs text-blue-600 font-bold uppercase mb-1 tracking-wider">Objetivo</div>
                 <div className="text-3xl font-bold text-[#0B2149]">{plannedRpe}</div>
               </div>
+
               <div className="bg-white p-4 rounded-xl border border-slate-200 text-center relative overflow-hidden shadow-sm">
                 {Number(avgRpeSession) > plannedRpe + 1 && (
                   <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">+ DURO</div>
