@@ -15,13 +15,13 @@ type Role = 'player' | 'staff';
 export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
-  
   const [currentScreen, setCurrentScreen] = useState<Screen>('player-home');
   
+  // ESTADOS DE COMPLETADO
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
+  const [rpeCompleted, setRpeCompleted] = useState(false); // <--- NUEVO ESTADO
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
 
-  // 1. AL ARRANCAR LA APP
   useEffect(() => {
     const savedUser = localStorage.getItem('alaves_user');
     const savedRole = localStorage.getItem('alaves_role') as Role;
@@ -30,44 +30,54 @@ export default function App() {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
       
-      // Si es Staff, al dashboard
       if (savedRole === 'staff') {
         setCurrentScreen('staff');
       } else {
-        // Si es Jugadora, a casa y COMPROBAR ESTADO
         setCurrentScreen('player-home');
         checkDailyStatus(savedUser); 
       }
     }
   }, []);
 
-  // 2. FUNCIÓN DE COMPROBACIÓN (ESTRATEGIA "SIN ERRORES DE ÍNDICE")
+  // FUNCIÓN DE COMPROBACIÓN MEJORADA (Wellness + RPE)
   const checkDailyStatus = async (playerName: string) => {
     try {
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Inicio del día de hoy
+      today.setHours(0, 0, 0, 0);
 
-      // CONSULTA SIMPLIFICADA: Traemos todo lo de hoy. 
-      // Al no filtrar por nombre AQUÍ, evitamos el error de "Falta Índice" de Firebase.
-      const q = query(
+      // Consulta Wellness
+      const qWellness = query(
         collection(db, "wellness_logs"),
         where("timestamp", ">=", today.getTime())
       );
 
-      const querySnapshot = await getDocs(q);
+      // Consulta RPE (Nueva)
+      const qRpe = query(
+        collection(db, "rpe_logs"),
+        where("timestamp", ">=", today.getTime())
+      );
 
-      // FILTRAMOS EN EL CLIENTE (Tu móvil hace el trabajo final)
-      // Buscamos si en los registros de hoy, hay alguno con MI nombre
-      const myLog = querySnapshot.docs.find(doc => doc.data().playerName === playerName);
+      // Ejecutamos ambas en paralelo
+      const [snapWellness, snapRpe] = await Promise.all([
+        getDocs(qWellness), 
+        getDocs(qRpe)
+      ]);
 
-      if (myLog) {
-        console.log("✅ Wellness encontrado para hoy:", playerName);
+      // Filtrado Wellness
+      const myWellness = snapWellness.docs.find(doc => doc.data().playerName === playerName);
+      if (myWellness) {
         setWellnessCompleted(true);
-        // Recuperamos el score que se guardó para mostrarlo
-        setWeeklyReadiness(myLog.data().readinessScore || 7.5);
+        setWeeklyReadiness(myWellness.data().readinessScore || 7.5);
       } else {
-        console.log("❌ No se ha encontrado wellness hoy para:", playerName);
         setWellnessCompleted(false);
+      }
+
+      // Filtrado RPE
+      const myRpe = snapRpe.docs.find(doc => doc.data().playerName === playerName);
+      if (myRpe) {
+        setRpeCompleted(true);
+      } else {
+        setRpeCompleted(false);
       }
 
     } catch (error) {
@@ -85,16 +95,16 @@ export default function App() {
       setCurrentScreen('staff');
     } else {
       setCurrentScreen('player-home');
-      checkDailyStatus(name); // Comprobar al entrar
+      checkDailyStatus(name);
     }
-    
     toast.success(`Hola, ${name}`);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setUserRole(null);
-    setWellnessCompleted(false); // Limpiamos estado
+    setWellnessCompleted(false);
+    setRpeCompleted(false); // Reset
     localStorage.removeItem('alaves_user');
     localStorage.removeItem('alaves_role');
     setCurrentScreen('player-home');
@@ -111,7 +121,6 @@ export default function App() {
         data.mood * 0.15
       );
 
-      // Guardamos en Firebase
       await addDoc(collection(db, "wellness_logs"), {
         ...data,
         readinessScore: readiness,
@@ -120,7 +129,6 @@ export default function App() {
         timestamp: Date.now()
       });
 
-      // Actualizamos estado visual inmediatamente
       setWellnessCompleted(true);
       setWeeklyReadiness(readiness);
       toast.success("¡Wellness guardado correctamente!");
@@ -141,6 +149,8 @@ export default function App() {
         date: new Date(),
         timestamp: Date.now()
       });
+      
+      setRpeCompleted(true); // <--- Marcamos completado
       toast.success("RPE registrado correctamente");
     } catch (error) {
       console.error(error);
@@ -157,7 +167,6 @@ export default function App() {
     );
   }
 
-  // --- RENDERIZADO PARA STAFF ---
   if (userRole === 'staff') {
     return (
       <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
@@ -167,12 +176,10 @@ export default function App() {
     );
   }
 
-  // --- RENDERIZADO PARA JUGADORA ---
   return (
     <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
       <Toaster position="top-center" />
 
-      {/* Botón Salir (Solo en la Home) */}
       {currentScreen === 'player-home' && (
         <div className="fixed top-6 right-6 z-50">
           <button
@@ -188,7 +195,8 @@ export default function App() {
         <PlayerHome
           playerName={currentUser}
           onNavigate={setCurrentScreen}
-          wellnessCompleted={wellnessCompleted} // Pasamos el estado recuperado
+          wellnessCompleted={wellnessCompleted}
+          rpeCompleted={rpeCompleted} // <--- Pasamos la prop nueva
           weeklyReadiness={weeklyReadiness}
         />
       )}

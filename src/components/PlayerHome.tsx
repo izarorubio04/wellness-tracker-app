@@ -1,13 +1,20 @@
-import { Calendar, Activity, TrendingUp } from 'lucide-react';
+import { Calendar, Activity, TrendingUp, Check } from 'lucide-react'; // <--- Añado Check
 
 interface PlayerHomeProps {
   playerName: string;
   onNavigate: (screen: string) => void;
   wellnessCompleted: boolean;
+  rpeCompleted: boolean; // <--- NUEVA PROP
   weeklyReadiness: number;
 }
 
-export function PlayerHome({ playerName, onNavigate, wellnessCompleted, weeklyReadiness }: PlayerHomeProps) {
+export function PlayerHome({ 
+  playerName, 
+  onNavigate, 
+  wellnessCompleted, 
+  rpeCompleted, // <--- Recibimos el estado
+  weeklyReadiness 
+}: PlayerHomeProps) {
   const readinessPercentage = (weeklyReadiness / 10) * 100;
   const readinessColor = weeklyReadiness >= 7 ? '#10B981' : weeklyReadiness >= 5 ? '#F59E0B' : '#EF4444';
 
@@ -45,7 +52,7 @@ export function PlayerHome({ playerName, onNavigate, wellnessCompleted, weeklyRe
           <div className="w-full bg-[#10B981] rounded-2xl p-6 shadow-lg">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                <Activity className="w-7 h-7 text-white" />
+                <Check className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 text-left">
                 <h3 className="text-lg mb-1 text-white">✓ Wellness Completado</h3>
@@ -62,17 +69,8 @@ export function PlayerHome({ playerName, onNavigate, wellnessCompleted, weeklyRe
           <h3 className="text-lg mb-6 text-[#0B2149]">Estado de la Semana</h3>
           <div className="flex items-center gap-6">
             <div className="relative w-32 h-32">
-              {/* Background Circle */}
               <svg className="w-32 h-32 transform -rotate-90">
-                <circle
-                  cx="64"
-                  cy="64"
-                  r="56"
-                  stroke="#E2E8F0"
-                  strokeWidth="12"
-                  fill="none"
-                />
-                {/* Progress Circle */}
+                <circle cx="64" cy="64" r="56" stroke="#E2E8F0" strokeWidth="12" fill="none" />
                 <circle
                   cx="64"
                   cy="64"
@@ -114,15 +112,22 @@ export function PlayerHome({ playerName, onNavigate, wellnessCompleted, weeklyRe
       <div className="mx-6">
         <h3 className="text-white mb-4">Acceso Rápido</h3>
         <div className="grid grid-cols-2 gap-4">
+          
+          {/* BOTÓN RPE MODIFICADO */}
           <button
             onClick={() => onNavigate('rpe')}
-            className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 active:scale-95 transition-transform"
+            className={`backdrop-blur-sm rounded-2xl p-6 active:scale-95 transition-transform ${
+              rpeCompleted ? 'bg-[#10B981]' : 'bg-white/10'
+            }`}
           >
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
-              <TrendingUp className="w-6 h-6 text-white" />
+              {rpeCompleted ? <Check className="w-6 h-6 text-white" /> : <TrendingUp className="w-6 h-6 text-white" />}
             </div>
-            <h4 className="text-white text-sm">RPE Post-Entreno</h4>
+            <h4 className="text-white text-sm">
+              {rpeCompleted ? 'RPE Enviado' : 'RPE Post-Entreno'}
+            </h4>
           </button>
+
           <button className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 active:scale-95 transition-transform">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
               <Calendar className="w-6 h-6 text-white" />
