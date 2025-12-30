@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   AlertTriangle,
-  LogOut, // <--- CAMBIO: Icono de LogOut en vez de ArrowLeft
+  LogOut,
   Moon,
   Zap,
   Activity,
@@ -52,6 +52,36 @@ import { Label } from "./ui/label";
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 
+// --- LISTA MAESTRA DE LA PLANTILLA ---
+// Importante: Estos nombres deben coincidir con los de Login.tsx
+const SQUAD_NAMES = [
+  "Eider Egaña",
+  "Helene Altuna",
+  "Paula Rubio",
+  "Ainhize Antolín",
+  "Aintzane Fernándes",
+  "Maialen Gómez",
+  "Estrella Lorente",
+  "Carla Cerain",
+  "Iraide Revuelta",
+  "Aiala Mugueta",
+  "Maialen Garlito",
+  "Izaro Rubio",
+  "Naroa García",
+  "Irati Collantes",
+  "Irati Martínez",
+  "Ariadna Nayaded",
+  "Izaro Tores",
+  "Iratxe Balanzategui",
+  "Naiara Óliver",
+  "Lucía Daisa",
+  "Jennifer Ngo",
+  "Sofía Martínez",
+  "Rania Zaaboul",
+  "Erika Nicole",
+  "Andrea Egea"
+];
+
 interface Player {
   id: string;
   name: string;
@@ -76,7 +106,6 @@ interface Player {
   };
 }
 
-// CAMBIO: Ahora recibimos onLogout en lugar de onBack
 interface StaffDashboardProps {
   onLogout: () => void;
 }
@@ -132,6 +161,18 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
 
       const playersMap = new Map<string, Player>();
 
+      // 1. INICIALIZAR TODA LA PLANTILLA COMO "VACÍA"
+      // Así garantizamos que salgan en la lista aunque no hayan hecho nada
+      SQUAD_NAMES.forEach(name => {
+        playersMap.set(name, {
+          id: name, // Usamos el nombre como ID temporal
+          name: name,
+          position: "JUG",
+          // Wellness y RPE empiezan undefined (pendientes)
+        });
+      });
+
+      // 2. RELLENAR CON DATOS DE WELLNESS (Si existen)
       wellnessSnapshot.forEach((doc) => {
         const data = doc.data();
         const name = data.playerName || "Desconocida";
@@ -140,13 +181,17 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
         if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8) status = 'risk';
         else if (data.fatigueLevel >= 6 || data.readinessScore < 5) status = 'warning';
 
-        const playerEntry = playersMap.get(name) || {
+        // Recuperamos la jugadora del mapa (o creamos una nueva si no estaba en la lista oficial)
+        const existingPlayer = playersMap.get(name) || {
             id: doc.id,
             name: name,
             position: "JUG",
         };
 
-        playerEntry.wellness = {
+        // Actualizamos sus datos
+        playersMap.set(name, {
+          ...existingPlayer,
+          wellness: {
             sleep: data.sleepQuality,
             fatigue: data.fatigueLevel,
             soreness: data.muscleSoreness,
@@ -156,29 +201,32 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
             status: status,
             submittedAt: new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
             notes: data.notes
-        };
-        playersMap.set(name, playerEntry);
+          }
+        });
       });
 
+      // 3. RELLENAR CON DATOS DE RPE (Si existen)
       rpeSnapshot.forEach((doc) => {
         const data = doc.data();
         const name = data.playerName || "Desconocida";
         const dateObj = new Date(data.timestamp);
 
-        const playerEntry = playersMap.get(name) || {
+        const existingPlayer = playersMap.get(name) || {
             id: doc.id,
             name: name,
             position: "JUG",
         };
 
-        playerEntry.rpe = {
+        playersMap.set(name, {
+          ...existingPlayer,
+          rpe: {
             yesterday: 0,
             todaySession: data.rpeValue,
             notes: data.notes,
             submittedAt: dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
             isLate: dateObj.getHours() >= 22
-        };
-        playersMap.set(name, playerEntry);
+          }
+        });
       });
 
       setCurrentPlayers(Array.from(playersMap.values()));
@@ -261,7 +309,9 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
         ).toFixed(1)
       : "0.0";
   
+  // Ahora totalPlayers es la longitud real de la plantilla
   const totalPlayers = currentPlayers.length;
+  
   const completedCount =
     activeTab === "morning"
       ? currentPlayers.filter((p) => p.wellness).length
@@ -273,8 +323,15 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     type: "morning" | "session";
   }) => {
     const isWellness = type === "morning";
+    
+    // FILTROS:
+    // Pendientes: Aquellas que NO tienen el dato
+    const pending = currentPlayers.filter((p) =>
+      isWellness ? !p.wellness : !p.rpe
+    );
+    // Completadas: Aquellas que SÍ tienen el dato
     const completed = currentPlayers.filter((p) =>
-      isWellness ? p.wellness : p.rpe,
+      isWellness ? p.wellness : p.rpe
     );
 
     const getStatus = (player: Player) => {
@@ -295,12 +352,38 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     return (
       <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
         <div className="space-y-6">
+          
+          {/* SECCIÓN PENDIENTES (AHORA VISIBLE) */}
+          {pending.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-red-400" /> Pendientes ({pending.length})
+              </h4>
+              <div className="space-y-2">
+                {pending.map((player) => (
+                  <div key={player.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100 opacity-70">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
+                        {player.name.charAt(0)}
+                      </div>
+                      <span className="text-sm font-medium text-slate-600">{player.name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white hover:bg-white">
+                      Sin datos
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN COMPLETADOS */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Entregados (
+            <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2 mt-4">
+              <CheckCircle2 className="w-4 h-4 text-green-600" /> Entregados (
               {completed.length})
             </h4>
-            {completed.length === 0 && <p className="text-xs text-slate-400">Sin registros aún.</p>}
+            {completed.length === 0 && <p className="text-xs text-slate-400">Nadie ha entregado todavía.</p>}
             
             <div className="space-y-2">
               {completed.map((player) => {
@@ -362,7 +445,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-8 text-white shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            {/* CAMBIO: BOTÓN DE LOGOUT AQUI */}
             <button
               onClick={onLogout}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 hover:text-white transition-colors active:scale-95"
@@ -472,9 +554,9 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           </TabsList>
 
           <TabsContent value="morning" className="space-y-4 mt-4 animate-in slide-in-from-bottom-2 duration-500">
-            {currentPlayers.length === 0 && !loading && (
+            {currentPlayers.filter(p => p.wellness).length === 0 && !loading && (
                 <div className="text-center py-10 text-slate-400 text-sm">
-                    No hay registros para este día.
+                    No hay registros completados hoy.
                 </div>
             )}
 
