@@ -6,7 +6,6 @@ import { StaffDashboard } from './components/StaffDashboard';
 import { Login } from './components/Login';
 import { LogOut } from 'lucide-react';
 import { db } from './firebase';
-// AÑADIDO: Importamos query, where y getDocs para buscar si ya existen datos
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
@@ -19,12 +18,10 @@ export default function App() {
   
   const [currentScreen, setCurrentScreen] = useState<Screen>('player-home');
   
-  // Estados para saber si ya se completó hoy
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
-  // Podríamos añadir rpeCompleted también si quieres bloquear el RPE
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
 
-  // 1. EFECTO DE INICIO DE SESIÓN Y PERSISTENCIA
+  // 1. AL ARRANCAR LA APP
   useEffect(() => {
     const savedUser = localStorage.getItem('alaves_user');
     const savedRole = localStorage.getItem('alaves_role') as Role;
@@ -32,37 +29,44 @@ export default function App() {
     if (savedUser && savedRole) {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
-      setCurrentScreen(savedRole === 'staff' ? 'staff' : 'player-home');
       
-      // Si es jugadora, comprobamos inmediatamente si ya hizo los deberes hoy
-      if (savedRole === 'player') {
-        checkDailyStatus(savedUser);
+      // Si es Staff, al dashboard
+      if (savedRole === 'staff') {
+        setCurrentScreen('staff');
+      } else {
+        // Si es Jugadora, a casa y COMPROBAR ESTADO
+        setCurrentScreen('player-home');
+        checkDailyStatus(savedUser); 
       }
     }
   }, []);
 
-  // 2. FUNCIÓN MAGICA: Comprueba en Firebase si ya existen datos de HOY
+  // 2. FUNCIÓN DE COMPROBACIÓN (ESTRATEGIA "SIN ERRORES DE ÍNDICE")
   const checkDailyStatus = async (playerName: string) => {
     try {
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Inicio del día
+      today.setHours(0, 0, 0, 0); // Inicio del día de hoy
 
-      // Consulta: Dame documentos de wellness de ESTA jugadora DESDE hoy a las 00:00
+      // CONSULTA SIMPLIFICADA: Traemos todo lo de hoy. 
+      // Al no filtrar por nombre AQUÍ, evitamos el error de "Falta Índice" de Firebase.
       const q = query(
         collection(db, "wellness_logs"),
-        where("playerName", "==", playerName),
         where("timestamp", ">=", today.getTime())
       );
 
       const querySnapshot = await getDocs(q);
 
-      // Si encuentra algún documento, es que ya lo ha hecho
-      if (!querySnapshot.empty) {
+      // FILTRAMOS EN EL CLIENTE (Tu móvil hace el trabajo final)
+      // Buscamos si en los registros de hoy, hay alguno con MI nombre
+      const myLog = querySnapshot.docs.find(doc => doc.data().playerName === playerName);
+
+      if (myLog) {
+        console.log("✅ Wellness encontrado para hoy:", playerName);
         setWellnessCompleted(true);
-        // Opcional: Podrías recuperar el último readiness calculado si quisieras mostrarlo
-        // const lastLog = querySnapshot.docs[0].data();
-        // setWeeklyReadiness(lastLog.readinessScore);
+        // Recuperamos el score que se guardó para mostrarlo
+        setWeeklyReadiness(myLog.data().readinessScore || 7.5);
       } else {
+        console.log("❌ No se ha encontrado wellness hoy para:", playerName);
         setWellnessCompleted(false);
       }
 
@@ -77,11 +81,11 @@ export default function App() {
     localStorage.setItem('alaves_user', name);
     localStorage.setItem('alaves_role', role);
     
-    setCurrentScreen(role === 'staff' ? 'staff' : 'player-home');
-    
-    // Al loguearse, comprobamos también
-    if (role === 'player') {
-      checkDailyStatus(name);
+    if (role === 'staff') {
+      setCurrentScreen('staff');
+    } else {
+      setCurrentScreen('player-home');
+      checkDailyStatus(name); // Comprobar al entrar
     }
     
     toast.success(`Hola, ${name}`);
@@ -90,7 +94,7 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setUserRole(null);
-    setWellnessCompleted(false); // Reseteamos al salir
+    setWellnessCompleted(false); // Limpiamos estado
     localStorage.removeItem('alaves_user');
     localStorage.removeItem('alaves_role');
     setCurrentScreen('player-home');
@@ -107,6 +111,7 @@ export default function App() {
         data.mood * 0.15
       );
 
+      // Guardamos en Firebase
       await addDoc(collection(db, "wellness_logs"), {
         ...data,
         readinessScore: readiness,
@@ -115,12 +120,14 @@ export default function App() {
         timestamp: Date.now()
       });
 
+      // Actualizamos estado visual inmediatamente
       setWellnessCompleted(true);
       setWeeklyReadiness(readiness);
-      toast.success("¡Wellness guardado!");
+      toast.success("¡Wellness guardado correctamente!");
+      
     } catch (error) {
       console.error("Error guardando:", error);
-      toast.error("Error al guardar");
+      toast.error("Error al guardar los datos");
     }
   };
 
@@ -134,7 +141,7 @@ export default function App() {
         date: new Date(),
         timestamp: Date.now()
       });
-      toast.success("RPE registrado");
+      toast.success("RPE registrado correctamente");
     } catch (error) {
       console.error(error);
       toast.error("Error al guardar RPE");
@@ -181,7 +188,7 @@ export default function App() {
         <PlayerHome
           playerName={currentUser}
           onNavigate={setCurrentScreen}
-          wellnessCompleted={wellnessCompleted} // Ahora esto será TRUE si Firebase dice que ya existe
+          wellnessCompleted={wellnessCompleted} // Pasamos el estado recuperado
           weeklyReadiness={weeklyReadiness}
         />
       )}
