@@ -6,7 +6,8 @@ import { StaffDashboard } from './components/StaffDashboard';
 import { Login } from './components/Login';
 import { LogOut } from 'lucide-react';
 import { db } from './firebase';
-import { collection, addDoc } from 'firebase/firestore';
+// AÑADIDO: Importamos query, where y getDocs para buscar si ya existen datos
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
 type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff';
@@ -17,9 +18,13 @@ export default function App() {
   const [userRole, setUserRole] = useState<Role | null>(null);
   
   const [currentScreen, setCurrentScreen] = useState<Screen>('player-home');
+  
+  // Estados para saber si ya se completó hoy
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
+  // Podríamos añadir rpeCompleted también si quieres bloquear el RPE
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
 
+  // 1. EFECTO DE INICIO DE SESIÓN Y PERSISTENCIA
   useEffect(() => {
     const savedUser = localStorage.getItem('alaves_user');
     const savedRole = localStorage.getItem('alaves_role') as Role;
@@ -28,8 +33,43 @@ export default function App() {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
       setCurrentScreen(savedRole === 'staff' ? 'staff' : 'player-home');
+      
+      // Si es jugadora, comprobamos inmediatamente si ya hizo los deberes hoy
+      if (savedRole === 'player') {
+        checkDailyStatus(savedUser);
+      }
     }
   }, []);
+
+  // 2. FUNCIÓN MAGICA: Comprueba en Firebase si ya existen datos de HOY
+  const checkDailyStatus = async (playerName: string) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Inicio del día
+
+      // Consulta: Dame documentos de wellness de ESTA jugadora DESDE hoy a las 00:00
+      const q = query(
+        collection(db, "wellness_logs"),
+        where("playerName", "==", playerName),
+        where("timestamp", ">=", today.getTime())
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      // Si encuentra algún documento, es que ya lo ha hecho
+      if (!querySnapshot.empty) {
+        setWellnessCompleted(true);
+        // Opcional: Podrías recuperar el último readiness calculado si quisieras mostrarlo
+        // const lastLog = querySnapshot.docs[0].data();
+        // setWeeklyReadiness(lastLog.readinessScore);
+      } else {
+        setWellnessCompleted(false);
+      }
+
+    } catch (error) {
+      console.error("Error comprobando estado diario:", error);
+    }
+  };
 
   const handleLogin = (name: string, role: Role) => {
     setCurrentUser(name);
@@ -38,12 +78,19 @@ export default function App() {
     localStorage.setItem('alaves_role', role);
     
     setCurrentScreen(role === 'staff' ? 'staff' : 'player-home');
+    
+    // Al loguearse, comprobamos también
+    if (role === 'player') {
+      checkDailyStatus(name);
+    }
+    
     toast.success(`Hola, ${name}`);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setUserRole(null);
+    setWellnessCompleted(false); // Reseteamos al salir
     localStorage.removeItem('alaves_user');
     localStorage.removeItem('alaves_role');
     setCurrentScreen('player-home');
@@ -104,7 +151,6 @@ export default function App() {
   }
 
   // --- RENDERIZADO PARA STAFF ---
-  // Ahora es mucho más limpio: Solo el Dashboard con la función de salir
   if (userRole === 'staff') {
     return (
       <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
@@ -135,7 +181,7 @@ export default function App() {
         <PlayerHome
           playerName={currentUser}
           onNavigate={setCurrentScreen}
-          wellnessCompleted={wellnessCompleted}
+          wellnessCompleted={wellnessCompleted} // Ahora esto será TRUE si Firebase dice que ya existe
           weeklyReadiness={weeklyReadiness}
         />
       )}
