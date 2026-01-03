@@ -225,7 +225,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="¿Alguna molestia, dolor o comentario para el staff?"
-            className="w-full h-24 bg-slate-50 rounded-xl p-4 resize-none text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0B2149] placeholder:text-slate-400 transition-all"
+            className="w-full h-24 bg-slate-50 rounded-xl p-4 resize-none text-base border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0B2149] placeholder:text-slate-400 transition-all"
           />
         </div>
       </div>
