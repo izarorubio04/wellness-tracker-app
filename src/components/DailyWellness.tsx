@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Moon, Zap, Dumbbell, Brain, Smile, ArrowLeft, FileText } from 'lucide-react';
-import { cn } from './ui/utils'; // Asegúrate de tener esta utilidad (o usa clsx/tailwind-merge)
+import { cn } from './ui/utils';
 
 export interface WellnessData {
   sleepQuality: number;
@@ -123,7 +123,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-32">
       {/* Header */}
-      <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-10 rounded-b-[2.5rem] shadow-xl text-white mb-6">
+      <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-10 shadow-xl text-white mb-6">
         <button 
             onClick={onBack} 
             className="mb-6 flex items-center gap-2 text-blue-100 hover:text-white transition-colors active:scale-95 w-fit"
@@ -138,7 +138,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
       </div>
 
       {/* Formulario */}
-      <div className="px-5 space-y-4">
+      <div className="-mt-10 px-5 space-y-4">
         <NumberSelector
           icon={Moon}
           label="Calidad del Sueño"

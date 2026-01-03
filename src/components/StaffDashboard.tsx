@@ -79,7 +79,6 @@ const SQUAD_NAMES = [
   "Sofía Martínez",
   "Rania Zaaboul",
   "Erika Nicole",
-  "Andrea Egea"
 ];
 
 interface Player {

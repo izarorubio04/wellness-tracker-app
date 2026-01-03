@@ -32,7 +32,6 @@ const PLAYERS = [
   "Sofía Martínez",
   "Rania Zaaboul",
   "Erika Nicole",
-  "Andrea Egea"
 ];
 
 export function Login({ onLogin }: LoginProps) {
