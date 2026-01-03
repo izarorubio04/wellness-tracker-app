@@ -18,43 +18,51 @@ interface DailyWellnessProps {
 }
 
 export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
-  // Inicializamos con valores por defecto
-  const [sleepQuality, setSleepQuality] = useState(7);
-  const [fatigueLevel, setFatigueLevel] = useState(5);
-  const [muscleSoreness, setMuscleSoreness] = useState(5);
-  const [stressLevel, setStressLevel] = useState(5);
-  const [mood, setMood] = useState(7);
+  // 1. CAMBIO: Inicializamos con null (sin valor por defecto)
+  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
+  const [fatigueLevel, setFatigueLevel] = useState<number | null>(null);
+  const [muscleSoreness, setMuscleSoreness] = useState<number | null>(null);
+  const [stressLevel, setStressLevel] = useState<number | null>(null);
+  const [mood, setMood] = useState<number | null>(null);
   
   const [menstruationStatus, setMenstruationStatus] = useState('none');
   const [notes, setNotes] = useState('');
 
+  // 2. CAMBIO: Comprobamos si todos los campos obligatorios tienen valor
+  const isFormValid = 
+    sleepQuality !== null && 
+    fatigueLevel !== null && 
+    muscleSoreness !== null && 
+    stressLevel !== null && 
+    mood !== null;
+
   const handleSubmit = () => {
+    if (!isFormValid) return; // Seguridad extra
+
     onSubmit({
-      sleepQuality,
-      fatigueLevel,
-      muscleSoreness,
-      stressLevel,
-      mood,
+      sleepQuality: sleepQuality!, // El ! asegura a TS que no es null aquí
+      fatigueLevel: fatigueLevel!,
+      muscleSoreness: muscleSoreness!,
+      stressLevel: stressLevel!,
+      mood: mood!,
       menstruationStatus,
       notes
     });
     onBack();
   };
 
-  // Lógica de colores para los botones
   const getColorClass = (val: number, inverted = false) => {
     if (inverted) {
-      if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600'; // Bien (Bajo)
-      if (val <= 6) return 'bg-amber-400 text-white border-amber-500';     // Regular
-      return 'bg-red-500 text-white border-red-600';                       // Mal (Alto)
+      if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600'; 
+      if (val <= 6) return 'bg-amber-400 text-white border-amber-500';     
+      return 'bg-red-500 text-white border-red-600';                       
     } else {
-      if (val >= 7) return 'bg-emerald-500 text-white border-emerald-600'; // Bien (Alto)
-      if (val >= 4) return 'bg-amber-400 text-white border-amber-500';     // Regular
-      return 'bg-red-500 text-white border-red-600';                       // Mal (Bajo)
+      if (val >= 7) return 'bg-emerald-500 text-white border-emerald-600'; 
+      if (val >= 4) return 'bg-amber-400 text-white border-amber-500';     
+      return 'bg-red-500 text-white border-red-600';                       
     }
   };
 
-  // Componente de Selección Numérica (Botones 1-10)
   const NumberSelector = ({ 
     icon: Icon, 
     label, 
@@ -64,17 +72,24 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
   }: { 
     icon: any, 
     label: string, 
-    value: number, 
+    value: number | null, // Acepta null ahora
     onChange: (val: number) => void, 
     inverted?: boolean 
   }) => {
-    // Calculamos el color del icono basado en el valor actual
-    const currentIconColor = inverted 
-        ? (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444')
-        : (value >= 7 ? '#10B981' : value >= 4 ? '#F59E0B' : '#EF4444');
+    
+    // Calculamos el color solo si hay valor, si no es gris
+    const currentIconColor = value === null 
+        ? '#94a3b8' // Gris si no hay selección
+        : (inverted 
+            ? (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444')
+            : (value >= 7 ? '#10B981' : value >= 4 ? '#F59E0B' : '#EF4444')
+          );
 
     return (
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+      <div className={cn(
+        "bg-white rounded-2xl p-5 shadow-sm border transition-colors duration-300",
+        value === null ? "border-slate-100" : "border-slate-200"
+      )}>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 transition-colors duration-300">
             <Icon className="w-5 h-5 transition-colors duration-300" style={{ color: currentIconColor }} />
@@ -82,10 +97,10 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           <div className="flex-1">
             <h4 className="text-sm font-bold text-[#0B2149]">{label}</h4>
           </div>
-          <div className="text-2xl font-black text-[#0B2149]">{value}</div>
+          {/* Muestra un guión si no hay valor */}
+          <div className="text-2xl font-black text-[#0B2149]">{value ?? '-'}</div>
         </div>
 
-        {/* Rejilla de botones */}
         <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
             const isSelected = value === num;
@@ -133,7 +148,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           </div>
           <span className="font-medium">Volver</span>
         </button>
-        <h1 className="text-3xl font-bold mb-2">Wellness Diario</h1>
+        <h1 className="text-3xl font-bold mb-2">Wellness</h1>
         <p className="text-blue-200 text-sm">Registra tus sensaciones pulsando del 1 al 10.</p>
       </div>
 
@@ -215,13 +230,19 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
         </div>
       </div>
 
-      {/* Botón Guardar Flotante */}
+      {/* 3. CAMBIO: Botón Guardar Flotante con estados Desactivado/Activado */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-6 z-50">
         <button
           onClick={handleSubmit}
-          className="w-full bg-[#0B2149] hover:bg-[#1a3a6b] text-white py-4 rounded-2xl active:scale-95 transition-all shadow-lg shadow-blue-900/20 font-bold text-lg flex items-center justify-center gap-2"
+          disabled={!isFormValid}
+          className={cn(
+            "w-full py-4 rounded-2xl transition-all font-bold text-lg flex items-center justify-center gap-2 shadow-lg",
+            isFormValid 
+              ? "bg-[#0B2149] hover:bg-[#1a3a6b] text-white active:scale-95 shadow-blue-900/20" 
+              : "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+          )}
         >
-          <span>Guardar Datos</span>
+          <span>{isFormValid ? "Guardar Datos" : "Completa todos los campos"}</span>
         </button>
       </div>
     </div>

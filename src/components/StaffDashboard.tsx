@@ -542,13 +542,13 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
               value="morning"
               className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600"
             >
-              ☀️ Morning Check
+              Wellness
             </TabsTrigger>
             <TabsTrigger
               value="session"
               className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600"
             >
-              📊 Session RPE
+              RPE
             </TabsTrigger>
           </TabsList>
 

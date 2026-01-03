@@ -23,7 +23,7 @@ export function PlayerHome({
       {/* Header */}
       <div className="px-6 pt-12 pb-8">
         <h1 className="text-white text-3xl mb-2">Hola, {playerName}</h1>
-        <p className="text-blue-200">¿Lista para entrenar hoy?</p>
+        <p className="text-blue-200">Deportivo Alavés</p>
       </div>
 
       {/* Action Card - Daily Wellness */}
@@ -38,7 +38,7 @@ export function PlayerHome({
                 <Activity className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <h3 className="text-lg mb-1 text-[#0B2149]">Completa tu Wellness Diario</h3>
+                <h3 className="text-lg mb-1 text-[#0B2149]">Completa tu Wellness</h3>
                 <p className="text-sm text-[#64748B]">Ayúdanos a cuidar de ti</p>
               </div>
               <div className="text-3xl">→</div>
