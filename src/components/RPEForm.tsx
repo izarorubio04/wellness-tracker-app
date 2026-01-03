@@ -126,7 +126,7 @@ export function RPEForm({ onBack, onSubmit }: RPEFormProps) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="¿Cómo te sentiste? ¿Alguna molestia?"
-            className="w-full h-24 bg-[#F8FAFC] rounded-xl p-4 resize-none text-sm border-none focus:outline-none focus:ring-2 focus:ring-[#0B2149]"
+            className="w-full h-24 bg-[#F8FAFC] rounded-xl p-4 resize-none text-base border-none focus:outline-none focus:ring-2 focus:ring-[#0B2149]"
           />
         </div>
       </div>
