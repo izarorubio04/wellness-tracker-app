@@ -78,8 +78,5 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-
-    /*"Cuando el usuario llegue al tope de arriba o de abajo de la página, NO hagas ninguna acción del navegador (como refrescar o rebotar), simplemente detén el scroll". */
-    overscroll-behavior-y: none;
   }
 }
