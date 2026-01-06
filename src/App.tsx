@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PlayerHome } from './components/PlayerHome';
 import { DailyWellness, WellnessData } from './components/DailyWellness';
 import { RPEForm } from './components/RPEForm';
-import { StaffDashboard } from './components/StaffDashboard';
+import { StaffDashboard } from './components/staff/StaffDashboard';
 import { Login } from './components/Login';
 import { LogOut } from 'lucide-react';
 import { db } from './firebase';
