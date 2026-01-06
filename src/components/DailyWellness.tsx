@@ -17,40 +17,21 @@ interface DailyWellnessProps {
   onSubmit: (data: WellnessData) => void;
 }
 
-export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
-  // 1. CAMBIO: Inicializamos con null (sin valor por defecto)
-  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
-  const [fatigueLevel, setFatigueLevel] = useState<number | null>(null);
-  const [muscleSoreness, setMuscleSoreness] = useState<number | null>(null);
-  const [stressLevel, setStressLevel] = useState<number | null>(null);
-  const [mood, setMood] = useState<number | null>(null);
+// --- 1. MOVEMOS EL COMPONENTE FUERA (ESTO ARREGLA EL SCROLL) ---
+const NumberSelector = ({ 
+  icon: Icon, 
+  label, 
+  value, 
+  onChange, 
+  inverted = false 
+}: { 
+  icon: any, 
+  label: string, 
+  value: number | null, 
+  onChange: (val: number) => void, 
+  inverted?: boolean 
+}) => {
   
-  const [menstruationStatus, setMenstruationStatus] = useState('none');
-  const [notes, setNotes] = useState('');
-
-  // 2. CAMBIO: Comprobamos si todos los campos obligatorios tienen valor
-  const isFormValid = 
-    sleepQuality !== null && 
-    fatigueLevel !== null && 
-    muscleSoreness !== null && 
-    stressLevel !== null && 
-    mood !== null;
-
-  const handleSubmit = () => {
-    if (!isFormValid) return; // Seguridad extra
-
-    onSubmit({
-      sleepQuality: sleepQuality!, // El ! asegura a TS que no es null aquí
-      fatigueLevel: fatigueLevel!,
-      muscleSoreness: muscleSoreness!,
-      stressLevel: stressLevel!,
-      mood: mood!,
-      menstruationStatus,
-      notes
-    });
-    onBack();
-  };
-
   const getColorClass = (val: number, inverted = false) => {
     if (inverted) {
       if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600'; 
@@ -63,76 +44,95 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
     }
   };
 
-  const NumberSelector = ({ 
-    icon: Icon, 
-    label, 
-    value, 
-    onChange, 
-    inverted = false 
-  }: { 
-    icon: any, 
-    label: string, 
-    value: number | null, // Acepta null ahora
-    onChange: (val: number) => void, 
-    inverted?: boolean 
-  }) => {
-    
-    // Calculamos el color solo si hay valor, si no es gris
-    const currentIconColor = value === null 
-        ? '#94a3b8' // Gris si no hay selección
-        : (inverted 
-            ? (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444')
-            : (value >= 7 ? '#10B981' : value >= 4 ? '#F59E0B' : '#EF4444')
-          );
+  const currentIconColor = value === null 
+      ? '#94a3b8' 
+      : (inverted 
+          ? (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444')
+          : (value >= 7 ? '#10B981' : value >= 4 ? '#F59E0B' : '#EF4444')
+        );
 
-    return (
-      <div className={cn(
-        "bg-white rounded-2xl p-5 shadow-sm border transition-colors duration-300",
-        value === null ? "border-slate-100" : "border-slate-200"
-      )}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 transition-colors duration-300">
-            <Icon className="w-5 h-5 transition-colors duration-300" style={{ color: currentIconColor }} />
-          </div>
-          <div className="flex-1">
-            <h4 className="text-sm font-bold text-[#0B2149]">{label}</h4>
-          </div>
-          {/* Muestra un guión si no hay valor */}
-          <div className="text-2xl font-black text-[#0B2149]">{value ?? '-'}</div>
+  return (
+    <div className={cn(
+      "bg-white rounded-2xl p-5 shadow-sm border transition-colors duration-300",
+      value === null ? "border-slate-100" : "border-slate-200"
+    )}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 transition-colors duration-300">
+          <Icon className="w-5 h-5 transition-colors duration-300" style={{ color: currentIconColor }} />
         </div>
-
-        <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-            const isSelected = value === num;
-            const colorClass = isSelected 
-              ? getColorClass(num, inverted) 
-              : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100';
-
-            return (
-              <button
-                key={num}
-                onClick={() => onChange(num)}
-                className={cn(
-                  "h-10 w-full rounded-lg font-bold text-sm transition-all duration-200 border-b-2 active:scale-95 flex items-center justify-center",
-                  colorClass
-                )}
-              >
-                {num}
-              </button>
-            );
-          })}
+        <div className="flex-1">
+          <h4 className="text-sm font-bold text-[#0B2149]">{label}</h4>
         </div>
-        
-        <div className="flex justify-between mt-2 px-1">
-           <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-             {inverted ? 'Mejor' : 'Peor'}
-           </span>
-           <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-             {inverted ? 'Peor' : 'Mejor'}
-           </span>
-        </div>
+        <div className="text-2xl font-black text-[#0B2149]">{value ?? '-'}</div>
       </div>
-    );
+
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+          const isSelected = value === num;
+          const colorClass = isSelected 
+            ? getColorClass(num, inverted) 
+            : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100';
+
+          return (
+            <button
+              key={num}
+              onClick={() => onChange(num)}
+              // Añadimos type="button" para evitar comportamientos raros de submit
+              type="button" 
+              className={cn(
+                "h-10 w-full rounded-lg font-bold text-sm transition-all duration-200 border-b-2 active:scale-95 flex items-center justify-center",
+                colorClass
+              )}
+            >
+              {num}
+            </button>
+          );
+        })}
+      </div>
+      
+      <div className="flex justify-between mt-2 px-1">
+         <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+           {inverted ? 'Mejor' : 'Peor'}
+         </span>
+         <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+           {inverted ? 'Peor' : 'Mejor'}
+         </span>
+      </div>
+    </div>
+  );
+};
+
+// --- 2. COMPONENTE PRINCIPAL ---
+export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
+  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
+  const [fatigueLevel, setFatigueLevel] = useState<number | null>(null);
+  const [muscleSoreness, setMuscleSoreness] = useState<number | null>(null);
+  const [stressLevel, setStressLevel] = useState<number | null>(null);
+  const [mood, setMood] = useState<number | null>(null);
+  
+  const [menstruationStatus, setMenstruationStatus] = useState('none');
+  const [notes, setNotes] = useState('');
+
+  const isFormValid = 
+    sleepQuality !== null && 
+    fatigueLevel !== null && 
+    muscleSoreness !== null && 
+    stressLevel !== null && 
+    mood !== null;
+
+  const handleSubmit = () => {
+    if (!isFormValid) return;
+
+    onSubmit({
+      sleepQuality: sleepQuality!,
+      fatigueLevel: fatigueLevel!,
+      muscleSoreness: muscleSoreness!,
+      stressLevel: stressLevel!,
+      mood: mood!,
+      menstruationStatus,
+      notes
+    });
+    onBack();
   };
 
   return (
@@ -199,6 +199,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
             {['none', 'active', 'pms'].map((status) => (
               <button
                 key={status}
+                type="button" // Importante: type button para que no recargue
                 onClick={() => setMenstruationStatus(status)}
                 className={cn(
                   "py-3 px-2 rounded-xl transition-all text-xs font-bold uppercase tracking-wide border-b-2",
@@ -213,7 +214,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           </div>
         </div>
 
-        {/* Notas */}
+        {/* Notas (Con el fix del zoom incluido: text-base) */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
@@ -230,7 +231,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
         </div>
       </div>
 
-      {/* 3. CAMBIO: Botón Guardar Flotante con estados Desactivado/Activado */}
+      {/* Botón Guardar Flotante */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-6 z-50">
         <button
           onClick={handleSubmit}
