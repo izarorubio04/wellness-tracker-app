@@ -31,8 +31,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-background);
   color: var(--color-text);
-  /*"Cuando el usuario llegue al tope de arriba o de abajo de la página, NO hagas ninguna acción del navegador (como refrescar o rebotar), simplemente detén el scroll". */
-  overscroll-behavior-y: none;
+  
 }
 
 * {

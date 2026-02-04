@@ -1,4 +1,4 @@
-import { AlertTriangle, Zap, Moon, Activity, MessageSquare, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Zap, Moon, Activity, MessageSquare, CheckCircle2, Frown } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Player } from "./types";
@@ -28,15 +28,27 @@ export function WellnessTab({ players, loading }: { players: Player[], loading: 
                   </div>
                   <Badge variant="destructive" className="uppercase text-[10px] tracking-wider">Revisar</Badge>
                 </div>
+                
+                {/* LÓGICA DE ICONOS ACTUALIZADA: AHORA > 7 ES MALO EN TODO */}
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  {player.wellness.fatigue >= 6 && (
+                  {player.wellness.fatigue >= 7 && (
                     <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 p-2 rounded-md font-medium border border-red-100">
                       <Zap className="w-3 h-3" /> Fatiga Alta ({player.wellness.fatigue})
                     </div>
                   )}
-                  {player.wellness.sleep <= 4 && (
+                  {player.wellness.sleep >= 7 && (
                     <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
                       <Moon className="w-3 h-3" /> Mal Sueño ({player.wellness.sleep})
+                    </div>
+                  )}
+                   {player.wellness.soreness >= 7 && (
+                    <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
+                      <Activity className="w-3 h-3" /> Dolor Muscular ({player.wellness.soreness})
+                    </div>
+                  )}
+                   {player.wellness.mood >= 7 && (
+                    <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-100 p-2 rounded-md font-medium border border-slate-200">
+                      <Frown className="w-3 h-3" /> Mal Ánimo ({player.wellness.mood})
                     </div>
                   )}
                   {player.wellness.menstruation !== "none" && (

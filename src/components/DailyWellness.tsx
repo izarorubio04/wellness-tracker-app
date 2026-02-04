@@ -17,39 +17,33 @@ interface DailyWellnessProps {
   onSubmit: (data: WellnessData) => void;
 }
 
-// --- 1. MOVEMOS EL COMPONENTE FUERA (ESTO ARREGLA EL SCROLL) ---
+// --- 1. COMPONENTE DE SELECCIÓN UNIFICADO (1 = MEJOR, 10 = PEOR) ---
 const NumberSelector = ({ 
   icon: Icon, 
   label, 
   value, 
-  onChange, 
-  inverted = false 
+  onChange
 }: { 
   icon: any, 
   label: string, 
   value: number | null, 
-  onChange: (val: number) => void, 
-  inverted?: boolean 
+  onChange: (val: number) => void
 }) => {
   
-  const getColorClass = (val: number, inverted = false) => {
-    if (inverted) {
-      if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600'; 
-      if (val <= 6) return 'bg-amber-400 text-white border-amber-500';     
-      return 'bg-red-500 text-white border-red-600';                       
-    } else {
-      if (val >= 7) return 'bg-emerald-500 text-white border-emerald-600'; 
-      if (val >= 4) return 'bg-amber-400 text-white border-amber-500';     
-      return 'bg-red-500 text-white border-red-600';                       
-    }
+  // LÓGICA UNIFICADA: 
+  // 1-3: Verde (Mejor)
+  // 4-6: Ámbar (Regular)
+  // 7-10: Rojo (Peor)
+  const getColorClass = (val: number) => {
+    if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600'; 
+    if (val <= 6) return 'bg-amber-400 text-white border-amber-500';     
+    return 'bg-red-500 text-white border-red-600';                       
   };
 
+  // Color del icono principal según el valor seleccionado
   const currentIconColor = value === null 
       ? '#94a3b8' 
-      : (inverted 
-          ? (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444')
-          : (value >= 7 ? '#10B981' : value >= 4 ? '#F59E0B' : '#EF4444')
-        );
+      : (value <= 3 ? '#10B981' : value <= 6 ? '#F59E0B' : '#EF4444');
 
   return (
     <div className={cn(
@@ -70,14 +64,13 @@ const NumberSelector = ({
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
           const isSelected = value === num;
           const colorClass = isSelected 
-            ? getColorClass(num, inverted) 
+            ? getColorClass(num) 
             : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100';
 
           return (
             <button
               key={num}
               onClick={() => onChange(num)}
-              // Añadimos type="button" para evitar comportamientos raros de submit
               type="button" 
               className={cn(
                 "h-10 w-full rounded-lg font-bold text-sm transition-all duration-200 border-b-2 active:scale-95 flex items-center justify-center",
@@ -90,12 +83,13 @@ const NumberSelector = ({
         })}
       </div>
       
+      {/* LEYENDA FIJA: SIEMPRE MEJOR A LA IZQUIERDA */}
       <div className="flex justify-between mt-2 px-1">
          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-           {inverted ? 'Mejor' : 'Peor'}
+           Mejor
          </span>
          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-           {inverted ? 'Peor' : 'Mejor'}
+           Peor
          </span>
       </div>
     </div>
@@ -150,6 +144,10 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
         </button>
         <h1 className="text-3xl font-bold mb-2">Wellness</h1>
         <p className="text-blue-200 text-sm">Registra tus sensaciones pulsando del 1 al 10.</p>
+        <div className="mt-2 flex gap-4 text-xs bg-white/10 p-2 rounded-lg inline-flex">
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400"></div> 1 = Óptimo</span>
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400"></div> 10 = Pésimo</span>
+        </div>
       </div>
 
       {/* Formulario */}
@@ -166,7 +164,6 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           label="Nivel de Fatiga"
           value={fatigueLevel}
           onChange={setFatigueLevel}
-          inverted
         />
 
         <NumberSelector
@@ -174,7 +171,6 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           label="Dolor Muscular"
           value={muscleSoreness}
           onChange={setMuscleSoreness}
-          inverted
         />
 
         <NumberSelector
@@ -182,7 +178,6 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           label="Nivel de Estrés"
           value={stressLevel}
           onChange={setStressLevel}
-          inverted
         />
 
         <NumberSelector
@@ -199,7 +194,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
             {['none', 'active', 'pms'].map((status) => (
               <button
                 key={status}
-                type="button" // Importante: type button para que no recargue
+                type="button"
                 onClick={() => setMenstruationStatus(status)}
                 className={cn(
                   "py-3 px-2 rounded-xl transition-all text-xs font-bold uppercase tracking-wide border-b-2",
@@ -214,7 +209,7 @@ export function DailyWellness({ onBack, onSubmit }: DailyWellnessProps) {
           </div>
         </div>
 
-        {/* Notas (Con el fix del zoom incluido: text-base) */}
+        {/* Notas */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">

@@ -19,7 +19,7 @@ export default function App() {
   
   // ESTADOS DE COMPLETADO
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
-  const [rpeCompleted, setRpeCompleted] = useState(false); // <--- NUEVO ESTADO
+  const [rpeCompleted, setRpeCompleted] = useState(false);
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
 
   useEffect(() => {
@@ -39,31 +39,26 @@ export default function App() {
     }
   }, []);
 
-  // FUNCIÓN DE COMPROBACIÓN MEJORADA (Wellness + RPE)
   const checkDailyStatus = async (playerName: string) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Consulta Wellness
       const qWellness = query(
         collection(db, "wellness_logs"),
         where("timestamp", ">=", today.getTime())
       );
 
-      // Consulta RPE (Nueva)
       const qRpe = query(
         collection(db, "rpe_logs"),
         where("timestamp", ">=", today.getTime())
       );
 
-      // Ejecutamos ambas en paralelo
       const [snapWellness, snapRpe] = await Promise.all([
         getDocs(qWellness), 
         getDocs(qRpe)
       ]);
 
-      // Filtrado Wellness
       const myWellness = snapWellness.docs.find(doc => doc.data().playerName === playerName);
       if (myWellness) {
         setWellnessCompleted(true);
@@ -72,7 +67,6 @@ export default function App() {
         setWellnessCompleted(false);
       }
 
-      // Filtrado RPE
       const myRpe = snapRpe.docs.find(doc => doc.data().playerName === playerName);
       if (myRpe) {
         setRpeCompleted(true);
@@ -104,7 +98,7 @@ export default function App() {
     setCurrentUser(null);
     setUserRole(null);
     setWellnessCompleted(false);
-    setRpeCompleted(false); // Reset
+    setRpeCompleted(false);
     localStorage.removeItem('alaves_user');
     localStorage.removeItem('alaves_role');
     setCurrentScreen('player-home');
@@ -113,24 +107,31 @@ export default function App() {
   const handleWellnessSubmit = async (data: WellnessData) => {
     if (!currentUser) return;
     try {
+      // NUEVA FÓRMULA:
+      // Como ahora 1 es Bueno y 10 es Malo en TODOS los campos,
+      // para calcular un Score donde 10 sea Perfecto, invertimos todos los valores.
+      // (11 - valor) transforma un 1 en 10, y un 10 en 1.
       const readiness = (
-        data.sleepQuality * 0.25 +
-        (10 - data.fatigueLevel) * 0.25 +
-        (10 - data.muscleSoreness) * 0.15 +
-        (10 - data.stressLevel) * 0.20 +
-        data.mood * 0.15
+        (11 - data.sleepQuality) * 0.25 +    // Sueño: 1(mejor) -> aporta 10 ptos
+        (11 - data.fatigueLevel) * 0.25 +    // Fatiga: 1(mejor) -> aporta 10 ptos
+        (11 - data.muscleSoreness) * 0.15 +  // Dolor: 1(mejor) -> aporta 10 ptos
+        (11 - data.stressLevel) * 0.20 +     // Estrés: 1(mejor) -> aporta 10 ptos
+        (11 - data.mood) * 0.15              // Humor: 1(mejor) -> aporta 10 ptos
       );
+
+      // Redondeamos a 1 decimal para que quede limpio
+      const finalReadiness = Math.round(readiness * 10) / 10;
 
       await addDoc(collection(db, "wellness_logs"), {
         ...data,
-        readinessScore: readiness,
+        readinessScore: finalReadiness,
         playerName: currentUser,
         date: new Date(),
         timestamp: Date.now()
       });
 
       setWellnessCompleted(true);
-      setWeeklyReadiness(readiness);
+      setWeeklyReadiness(finalReadiness);
       toast.success("¡Wellness guardado correctamente!");
       
     } catch (error) {
@@ -150,7 +151,7 @@ export default function App() {
         timestamp: Date.now()
       });
       
-      setRpeCompleted(true); // <--- Marcamos completado
+      setRpeCompleted(true);
       toast.success("RPE registrado correctamente");
     } catch (error) {
       console.error(error);
@@ -196,7 +197,7 @@ export default function App() {
           playerName={currentUser}
           onNavigate={setCurrentScreen}
           wellnessCompleted={wellnessCompleted}
-          rpeCompleted={rpeCompleted} // <--- Pasamos la prop nueva
+          rpeCompleted={rpeCompleted}
           weeklyReadiness={weeklyReadiness}
         />
       )}

@@ -47,9 +47,18 @@ export function useStaffData() {
         const data = docSnap.data();
         const name = data.playerName || "Desconocida";
         
+        // LOGICA DE RIESGO ACTUALIZADA (1 = MEJOR, 10 = PEOR)
+        // Ahora valores altos en CUALQUIER métrica son malos.
         let status: 'ready' | 'warning' | 'risk' = 'ready';
-        if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8) status = 'risk';
-        else if (data.fatigueLevel >= 6 || data.readinessScore < 5) status = 'warning';
+        
+        // Si cualquiera supera el 8 -> Riesgo
+        if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8 || data.sleepQuality >= 8 || data.mood >= 8) {
+            status = 'risk';
+        }
+        // Si cualquiera supera el 6 o el readiness calculado es muy bajo -> Warning
+        else if (data.fatigueLevel >= 6 || data.sleepQuality >= 6 || data.readinessScore < 5) {
+            status = 'warning';
+        }
 
         const existing = playersMap.get(name) || { id: docSnap.id, name, position: "JUG" };
         playersMap.set(name, {

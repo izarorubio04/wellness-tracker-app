@@ -13,6 +13,7 @@ import {
   ChevronDown,
   MessageSquare,
   Edit2,
+  Frown
 } from "lucide-react";
 import {
   Tabs,
@@ -53,7 +54,6 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 
 // --- LISTA MAESTRA DE LA PLANTILLA ---
-// Importante: Estos nombres deben coincidir con los de Login.tsx
 const SQUAD_NAMES = [
   "Eider Egaña",
   "Helene Altuna",
@@ -160,34 +160,30 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
 
       const playersMap = new Map<string, Player>();
 
-      // 1. INICIALIZAR TODA LA PLANTILLA COMO "VACÍA"
-      // Así garantizamos que salgan en la lista aunque no hayan hecho nada
       SQUAD_NAMES.forEach(name => {
         playersMap.set(name, {
-          id: name, // Usamos el nombre como ID temporal
+          id: name, 
           name: name,
           position: "JUG",
-          // Wellness y RPE empiezan undefined (pendientes)
         });
       });
 
-      // 2. RELLENAR CON DATOS DE WELLNESS (Si existen)
       wellnessSnapshot.forEach((doc) => {
         const data = doc.data();
         const name = data.playerName || "Desconocida";
         
+        // Lógica de Riesgo (1=Mejor, 10=Peor)
+        // Valores altos son malos.
         let status: 'ready' | 'warning' | 'risk' = 'ready';
-        if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8) status = 'risk';
+        if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8 || data.sleepQuality >= 8) status = 'risk';
         else if (data.fatigueLevel >= 6 || data.readinessScore < 5) status = 'warning';
 
-        // Recuperamos la jugadora del mapa (o creamos una nueva si no estaba en la lista oficial)
         const existingPlayer = playersMap.get(name) || {
             id: doc.id,
             name: name,
             position: "JUG",
         };
 
-        // Actualizamos sus datos
         playersMap.set(name, {
           ...existingPlayer,
           wellness: {
@@ -204,7 +200,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
         });
       });
 
-      // 3. RELLENAR CON DATOS DE RPE (Si existen)
       rpeSnapshot.forEach((doc) => {
         const data = doc.data();
         const name = data.playerName || "Desconocida";
@@ -308,7 +303,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
         ).toFixed(1)
       : "0.0";
   
-  // Ahora totalPlayers es la longitud real de la plantilla
   const totalPlayers = currentPlayers.length;
   
   const completedCount =
@@ -323,12 +317,9 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   }) => {
     const isWellness = type === "morning";
     
-    // FILTROS:
-    // Pendientes: Aquellas que NO tienen el dato
     const pending = currentPlayers.filter((p) =>
       isWellness ? !p.wellness : !p.rpe
     );
-    // Completadas: Aquellas que SÍ tienen el dato
     const completed = currentPlayers.filter((p) =>
       isWellness ? p.wellness : p.rpe
     );
@@ -351,8 +342,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     return (
       <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
         <div className="space-y-6">
-          
-          {/* SECCIÓN PENDIENTES (AHORA VISIBLE) */}
           {pending.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2">
@@ -376,7 +365,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
             </div>
           )}
 
-          {/* SECCIÓN COMPLETADOS */}
           <div>
             <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2 mt-4">
               <CheckCircle2 className="w-4 h-4 text-green-600" /> Entregados (
@@ -577,14 +565,24 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        {player.wellness.fatigue >= 6 && (
+                        {player.wellness.fatigue >= 7 && (
                           <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 p-2 rounded-md font-medium border border-red-100">
                             <Zap className="w-3 h-3" /> Fatiga Alta ({player.wellness.fatigue})
                           </div>
                         )}
-                        {player.wellness.sleep <= 4 && (
+                        {player.wellness.sleep >= 7 && (
                           <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
                             <Moon className="w-3 h-3" /> Mal Sueño ({player.wellness.sleep})
+                          </div>
+                        )}
+                        {player.wellness.soreness >= 7 && (
+                          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
+                            <Activity className="w-3 h-3" /> Dolor ({player.wellness.soreness})
+                          </div>
+                        )}
+                        {player.wellness.mood >= 7 && (
+                          <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-100 p-2 rounded-md font-medium border border-slate-200">
+                            <Frown className="w-3 h-3" /> Mal Ánimo ({player.wellness.mood})
                           </div>
                         )}
                         {player.wellness.menstruation !== "none" && (
