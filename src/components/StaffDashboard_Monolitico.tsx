@@ -13,7 +13,11 @@ import {
   ChevronDown,
   MessageSquare,
   Edit2,
-  Frown
+  Frown,
+  ArrowLeft,
+  Brain,
+  Smile,
+  Dumbbell
 } from "lucide-react";
 import {
   Tabs,
@@ -49,6 +53,7 @@ import {
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
+import { Separator } from "./ui/separator";
 
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
@@ -115,6 +120,9 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   
   const [currentPlayers, setCurrentPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Estado para la navegación a detalle
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const [plannedRpe, setPlannedRpe] = useState(5.0);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
@@ -172,8 +180,7 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
         const data = doc.data();
         const name = data.playerName || "Desconocida";
         
-        // Lógica de Riesgo (1=Mejor, 10=Peor)
-        // Valores altos son malos.
+        // 1=Mejor, 10=Peor
         let status: 'ready' | 'warning' | 'risk' = 'ready';
         if (data.fatigueLevel >= 8 || data.stressLevel >= 8 || data.muscleSoreness >= 8 || data.sleepQuality >= 8) status = 'risk';
         else if (data.fatigueLevel >= 6 || data.readinessScore < 5) status = 'warning';
@@ -252,29 +259,9 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
 
   const formatDateLabel = (date: Date) => {
     const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth();
-
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday =
-      date.getDate() === yesterday.getDate() &&
-      date.getMonth() === yesterday.getMonth();
-
-    const options: Intl.DateTimeFormatOptions = {
-      day: "numeric",
-      month: "short",
-    };
-    const dateStr = date.toLocaleDateString("es-ES", options);
-
-    if (isToday) return `Hoy, ${dateStr}`;
-    if (isYesterday) return `Ayer, ${dateStr}`;
-
-    const weekday = date.toLocaleDateString("es-ES", {
-      weekday: "short",
-    });
-    return `${weekday}, ${dateStr}`;
+    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
+    const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+    return isToday ? `Hoy, ${date.toLocaleDateString("es-ES", options)}` : date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
   };
 
   const previousDays = Array.from({ length: 5 }, (_, i) => {
@@ -284,58 +271,125 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   });
 
   const riskPlayers = currentPlayers.filter(
-    (p) =>
-      p.wellness?.status === "risk" ||
-      p.wellness?.status === "warning",
+    (p) => p.wellness?.status === "risk" || p.wellness?.status === "warning",
   );
   const readyPlayers = currentPlayers.filter(
     (p) => p.wellness?.status === "ready",
   );
 
   const rpeResponses = currentPlayers.filter((p) => p.rpe).length;
-  const avgRpeSession =
-    rpeResponses > 0
-      ? (
-          currentPlayers.reduce(
-            (acc, p) => acc + (p.rpe?.todaySession || 0),
-            0,
-          ) / rpeResponses
-        ).toFixed(1)
+  const avgRpeSession = rpeResponses > 0
+      ? (currentPlayers.reduce((acc, p) => acc + (p.rpe?.todaySession || 0), 0) / rpeResponses).toFixed(1)
       : "0.0";
   
   const totalPlayers = currentPlayers.length;
   
-  const completedCount =
-    activeTab === "morning"
+  const completedCount = activeTab === "morning"
       ? currentPlayers.filter((p) => p.wellness).length
       : currentPlayers.filter((p) => p.rpe).length;
 
-  const PlayersList = ({
-    type,
-  }: {
-    type: "morning" | "session";
-  }) => {
+  // --- VISTA DETALLADA ---
+  if (selectedPlayer && selectedPlayer.wellness) {
+     const player = selectedPlayer;
+     const wellness = player.wellness!;
+
+     const MetricCard = ({ icon: Icon, label, value }: { icon: any, label: string, value: number }) => {
+        let bgColor = "bg-green-50";
+        let textColor = "text-green-700";
+        let borderColor = "border-green-100";
+        
+        if (value >= 7) {
+          bgColor = "bg-red-50";
+          textColor = "text-red-700";
+          borderColor = "border-red-100";
+        } else if (value >= 4) {
+          bgColor = "bg-amber-50";
+          textColor = "text-amber-700";
+          borderColor = "border-amber-100";
+        }
+        return (
+          <div className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${bgColor} ${borderColor}`}>
+            <div className={`flex items-center gap-1.5 mb-1 opacity-80 ${textColor}`}>
+              <Icon className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+            </div>
+            <span className={`text-3xl font-black ${textColor}`}>{value}</span>
+          </div>
+        );
+     };
+
+     return (
+       <div className="min-h-screen bg-slate-50 pb-10 animate-in slide-in-from-right duration-300">
+         <div className="bg-white border-b border-slate-200 sticky top-0 z-10 px-6 py-4 flex items-center gap-4 shadow-sm">
+           <button 
+             onClick={() => setSelectedPlayer(null)}
+             className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors active:scale-95"
+           >
+             <ArrowLeft className="w-5 h-5" />
+           </button>
+           <div>
+             <h1 className="text-xl font-bold text-[#0B2149] leading-none">{player.name}</h1>
+             <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 font-medium">
+                <span>{player.position}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {wellness.submittedAt}</span>
+             </div>
+           </div>
+         </div>
+
+         <div className="px-6 py-6 max-w-2xl mx-auto space-y-6">
+           {wellness.notes && (
+             <div className="bg-yellow-50 p-5 rounded-2xl border border-yellow-100 flex gap-4 shadow-sm">
+               <div className="bg-yellow-100 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <MessageSquare className="w-5 h-5 text-yellow-700" />
+               </div>
+               <div>
+                 <h5 className="text-xs font-bold text-yellow-700 uppercase mb-1 tracking-wide">Nota</h5>
+                 <p className="text-slate-700 italic text-sm leading-relaxed">"{wellness.notes}"</p>
+               </div>
+             </div>
+           )}
+
+           <div>
+              <h3 className="text-[#0B2149] font-bold text-lg mb-4 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-500" /> Métricas Wellness
+              </h3>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <MetricCard icon={Moon} label="Sueño" value={wellness.sleep} />
+                <MetricCard icon={Zap} label="Fatiga" value={wellness.fatigue} />
+                <MetricCard icon={Dumbbell} label="Dolor" value={wellness.soreness} />
+                <MetricCard icon={Brain} label="Estrés" value={wellness.stress} />
+                <MetricCard icon={Smile} label="Ánimo" value={wellness.mood} />
+                <div className="flex flex-col items-center justify-center p-3 rounded-xl border bg-white border-slate-200 shadow-sm">
+                   <div className="flex items-center gap-1.5 mb-1 opacity-60">
+                      <Activity className="w-4 h-4 text-slate-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ciclo</span>
+                   </div>
+                   <span className={`text-lg font-bold capitalize ${wellness.menstruation !== 'none' ? 'text-pink-600' : 'text-slate-700'}`}>
+                     {wellness.menstruation === 'none' ? '-' : wellness.menstruation === 'pms' ? 'SPM' : 'Regla'}
+                   </span>
+                </div>
+              </div>
+           </div>
+         </div>
+       </div>
+     );
+  }
+
+  // --- COMPONENTE AUXILIAR PARA LA LISTA (Igual que antes) ---
+  const PlayersList = ({ type }: { type: "morning" | "session" }) => {
     const isWellness = type === "morning";
-    
-    const pending = currentPlayers.filter((p) =>
-      isWellness ? !p.wellness : !p.rpe
-    );
-    const completed = currentPlayers.filter((p) =>
-      isWellness ? p.wellness : p.rpe
-    );
+    const pending = currentPlayers.filter((p) => isWellness ? !p.wellness : !p.rpe);
+    const completed = currentPlayers.filter((p) => isWellness ? p.wellness : p.rpe);
 
     const getStatus = (player: Player) => {
       if (isWellness) {
         if (!player.wellness) return { label: "No completado", variant: "destructive" as const };
         const hour = parseInt(player.wellness.submittedAt.split(":")[0]);
-        return hour >= 12
-          ? { label: "Tarde", variant: "warning" as const }
-          : { label: "A tiempo", variant: "success" as const };
+        return hour >= 12 ? { label: "Tarde", variant: "warning" as const } : { label: "A tiempo", variant: "success" as const };
       } else {
         if (!player.rpe) return { label: "No completado", variant: "destructive" as const };
-        return player.rpe.isLate
-          ? { label: "Tarde", variant: "warning" as const }
-          : { label: "A tiempo", variant: "success" as const };
+        return player.rpe.isLate ? { label: "Tarde", variant: "warning" as const } : { label: "A tiempo", variant: "success" as const };
       }
     };
 
@@ -351,62 +405,36 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
                 {pending.map((player) => (
                   <div key={player.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100 opacity-70">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
-                        {player.name.charAt(0)}
-                      </div>
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">{player.name.charAt(0)}</div>
                       <span className="text-sm font-medium text-slate-600">{player.name}</span>
                     </div>
-                    <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white hover:bg-white">
-                      Sin datos
-                    </Badge>
+                    <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white hover:bg-white">Sin datos</Badge>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
           <div>
             <h4 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2 mt-4">
-              <CheckCircle2 className="w-4 h-4 text-green-600" /> Entregados (
-              {completed.length})
+              <CheckCircle2 className="w-4 h-4 text-green-600" /> Entregados ({completed.length})
             </h4>
             {completed.length === 0 && <p className="text-xs text-slate-400">Nadie ha entregado todavía.</p>}
-            
             <div className="space-y-2">
               {completed.map((player) => {
                 const status = getStatus(player);
-                const time = isWellness
-                  ? player.wellness?.submittedAt
-                  : player.rpe?.submittedAt;
-                const note = isWellness
-                  ? player.wellness?.notes
-                  : player.rpe?.notes;
-
+                const time = isWellness ? player.wellness?.submittedAt : player.rpe?.submittedAt;
+                const note = isWellness ? player.wellness?.notes : player.rpe?.notes;
                 return (
-                  <div
-                    key={player.id}
-                    className="flex flex-col bg-white p-3 rounded-lg border border-slate-100 shadow-sm gap-2"
-                  >
+                  <div key={player.id} className="flex flex-col bg-white p-3 rounded-lg border border-slate-100 shadow-sm gap-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#0B2149] text-white flex items-center justify-center text-xs font-bold">
-                          {player.name.charAt(0)}
-                        </div>
-                        <span className="text-sm font-medium text-[#0B2149]">
-                          {player.name}
-                        </span>
+                        <div className="w-8 h-8 rounded-full bg-[#0B2149] text-white flex items-center justify-center text-xs font-bold">{player.name.charAt(0)}</div>
+                        <span className="text-sm font-medium text-[#0B2149]">{player.name}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="w-3 h-3" /> {time}
-                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-400"><Clock className="w-3 h-3" /> {time}</div>
                         {status.variant !== "success" && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none"
-                          >
-                            {status.label}
-                          </Badge>
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none">{status.label}</Badge>
                         )}
                       </div>
                     </div>
@@ -432,57 +460,28 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-8 text-white shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onLogout}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 hover:text-white transition-colors active:scale-95"
-              title="Cerrar Sesión"
-            >
+            <button onClick={onLogout} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 hover:text-white transition-colors active:scale-95" title="Cerrar Sesión">
               <LogOut className="w-5 h-5" />
             </button>
-
             <DropdownMenu>
               <DropdownMenuTrigger className="outline-none">
                 <div className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-colors cursor-pointer border border-white/10">
                   <CalendarIcon className="w-4 h-4 text-blue-200" />
-                  <span className="font-medium text-sm">
-                    {formatDateLabel(selectedDate)}
-                  </span>
+                  <span className="font-medium text-sm">{formatDateLabel(selectedDate)}</span>
                   <ChevronDown className="w-4 h-4 opacity-50" />
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-56 bg-white text-slate-900 border border-slate-200 shadow-lg z-50 p-1"
-              >
+              <DropdownMenuContent align="start" className="w-56 bg-white text-slate-900 border border-slate-200 shadow-lg z-50 p-1">
                 {previousDays.map((date, idx) => (
-                  <DropdownMenuItem
-                    key={idx}
-                    onClick={() => setSelectedDate(date)}
-                    className="cursor-pointer gap-2 hover:bg-slate-100 focus:bg-slate-100 text-slate-700"
-                  >
-                    {date.getDate() ===
-                      selectedDate.getDate() && (
-                      <CheckCircle2 className="w-4 h-4 text-[#0B2149]" />
-                    )}
-                    <span
-                      className={
-                        date.getDate() ===
-                        selectedDate.getDate()
-                          ? "font-bold text-[#0B2149]"
-                          : ""
-                      }
-                    >
-                      {formatDateLabel(date)}
-                    </span>
+                  <DropdownMenuItem key={idx} onClick={() => setSelectedDate(date)} className="cursor-pointer gap-2 hover:bg-slate-100 focus:bg-slate-100 text-slate-700">
+                    {date.getDate() === selectedDate.getDate() && (<CheckCircle2 className="w-4 h-4 text-[#0B2149]" />)}
+                    <span className={date.getDate() === selectedDate.getDate() ? "font-bold text-[#0B2149]" : ""}>{formatDateLabel(date)}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          <div className="text-[10px] uppercase tracking-wider text-blue-200 font-semibold">
-            Staff View
-          </div>
+          <div className="text-[10px] uppercase tracking-wider text-blue-200 font-semibold">Staff View</div>
         </div>
 
         <div className="flex justify-between items-end">
@@ -492,30 +491,21 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
               <Activity className="w-3 h-3" /> {loading ? "Cargando..." : `Resumen del ${formatDateLabel(selectedDate)}`}
             </p>
           </div>
-
           <Sheet>
             <SheetTrigger asChild>
               <button className="text-right group active:scale-95 transition-transform bg-white/5 p-2 pr-3 rounded-lg border border-white/10 hover:bg-white/10">
                 <div className="text-2xl font-mono font-bold text-white group-hover:text-blue-100 transition-colors leading-none mb-1">
-                  {completedCount}
-                  <span className="text-sm text-blue-300 font-normal">
-                    /{totalPlayers}
-                  </span>
+                  {completedCount}<span className="text-sm text-blue-300 font-normal">/{totalPlayers}</span>
                 </div>
                 <div className="text-[10px] text-blue-200 uppercase tracking-widest flex items-center justify-end gap-1">
-                  Reportes
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                  Reportes <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
                 </div>
               </button>
             </SheetTrigger>
             <SheetContent className="w-[90%] sm:w-[400px] bg-white text-slate-900 border-l border-slate-200 z-50">
               <SheetHeader className="mb-6">
-                <SheetTitle className="text-[#0B2149] text-xl">
-                  Reportes: {activeTab === "morning" ? "Wellness" : "RPE"}
-                </SheetTitle>
-                <div className="text-sm text-slate-500">
-                  Detalle de entregas del {formatDateLabel(selectedDate)}
-                </div>
+                <SheetTitle className="text-[#0B2149] text-xl">Reportes: {activeTab === "morning" ? "Wellness" : "RPE"}</SheetTitle>
+                <div className="text-sm text-slate-500">Detalle de entregas del {formatDateLabel(selectedDate)}</div>
               </SheetHeader>
               <PlayersList type={activeTab as "morning" | "session"} />
             </SheetContent>
@@ -526,35 +516,21 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       <div className="px-4 -mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full bg-white p-1 rounded-xl shadow-lg border border-slate-100 h-14 grid grid-cols-2">
-            <TabsTrigger
-              value="morning"
-              className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600"
-            >
-              Wellness
-            </TabsTrigger>
-            <TabsTrigger
-              value="session"
-              className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600"
-            >
-              RPE
-            </TabsTrigger>
+            <TabsTrigger value="morning" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600">Wellness</TabsTrigger>
+            <TabsTrigger value="session" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-slate-600">RPE</TabsTrigger>
           </TabsList>
 
           <TabsContent value="morning" className="space-y-4 mt-4 animate-in slide-in-from-bottom-2 duration-500">
             {currentPlayers.filter(p => p.wellness).length === 0 && !loading && (
-                <div className="text-center py-10 text-slate-400 text-sm">
-                    No hay registros completados hoy.
-                </div>
+                <div className="text-center py-10 text-slate-400 text-sm">No hay registros completados hoy.</div>
             )}
-
             {riskPlayers.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-[#0B2149] font-semibold flex items-center gap-2 px-2 text-sm uppercase tracking-wide">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Requieren Atención ({riskPlayers.length})
+                  <AlertTriangle className="w-4 h-4 text-red-500" /> Requieren Atención ({riskPlayers.length})
                 </h3>
                 {riskPlayers.map((player) => player.wellness && (
-                  <Card key={player.id} className="border-l-4 border-l-red-500 shadow-sm overflow-hidden bg-white">
+                  <Card key={player.id} onClick={() => setSelectedPlayer(player)} className="border-l-4 border-l-red-500 shadow-sm overflow-hidden bg-white cursor-pointer hover:shadow-md transition-all">
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
@@ -563,35 +539,20 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
                         </div>
                         <Badge variant="destructive" className="uppercase text-[10px] tracking-wider">Revisar</Badge>
                       </div>
-
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         {player.wellness.fatigue >= 7 && (
-                          <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 p-2 rounded-md font-medium border border-red-100">
-                            <Zap className="w-3 h-3" /> Fatiga Alta ({player.wellness.fatigue})
-                          </div>
+                          <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 p-2 rounded-md font-medium border border-red-100"><Zap className="w-3 h-3" /> Fatiga Alta ({player.wellness.fatigue})</div>
                         )}
                         {player.wellness.sleep >= 7 && (
-                          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
-                            <Moon className="w-3 h-3" /> Mal Sueño ({player.wellness.sleep})
-                          </div>
+                          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100"><Moon className="w-3 h-3" /> Mal Sueño ({player.wellness.sleep})</div>
                         )}
                         {player.wellness.soreness >= 7 && (
-                          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100">
-                            <Activity className="w-3 h-3" /> Dolor ({player.wellness.soreness})
-                          </div>
+                          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-md font-medium border border-amber-100"><Activity className="w-3 h-3" /> Dolor ({player.wellness.soreness})</div>
                         )}
-                        {player.wellness.mood >= 7 && (
-                          <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-100 p-2 rounded-md font-medium border border-slate-200">
-                            <Frown className="w-3 h-3" /> Mal Ánimo ({player.wellness.mood})
-                          </div>
-                        )}
-                        {player.wellness.menstruation !== "none" && (
-                          <div className="flex items-center gap-2 text-xs text-pink-700 bg-pink-50 p-2 rounded-md font-medium border border-pink-100">
-                            <Activity className="w-3 h-3" /> {player.wellness.menstruation === "pms" ? "SPM" : "Menstruación"}
-                          </div>
+                         {player.wellness.mood >= 7 && (
+                          <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-100 p-2 rounded-md font-medium border border-slate-200"><Frown className="w-3 h-3" /> Mal Ánimo ({player.wellness.mood})</div>
                         )}
                       </div>
-
                       {player.wellness.notes && (
                         <div className="mt-3 flex items-start gap-2 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
                            <MessageSquare className="w-3.5 h-3.5 mt-0.5 text-yellow-600 flex-shrink-0" />
@@ -603,14 +564,12 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
                 ))}
               </div>
             )}
-
             <div className="space-y-2 pt-2">
               <h3 className="text-[#0B2149] font-semibold flex items-center gap-2 px-2 text-sm uppercase tracking-wide">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-                Disponibles ({readyPlayers.length})
+                <CheckCircle2 className="w-4 h-4 text-green-600" /> Disponibles ({readyPlayers.length})
               </h3>
               {readyPlayers.map((player) => (
-                <div key={player.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex flex-col gap-2 group hover:border-blue-200 transition-colors">
+                <div key={player.id} onClick={() => setSelectedPlayer(player)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex flex-col gap-2 group hover:border-blue-200 transition-all cursor-pointer">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-10 bg-green-500 rounded-full group-hover:scale-y-110 transition-transform"></div>
@@ -620,13 +579,13 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
                       </div>
                     </div>
                     <div className="flex gap-1 pr-2">
-                      {[1, 2, 3].map((i) => <div key={i} className="w-2 h-2 rounded-full bg-green-200" />)}
+                      <div className={`w-2 h-2 rounded-full ${player.wellness?.fatigue && player.wellness.fatigue >= 4 ? "bg-amber-300" : "bg-green-300"}`} />
+                      <div className={`w-2 h-2 rounded-full ${player.wellness?.sleep && player.wellness.sleep >= 4 ? "bg-amber-300" : "bg-green-300"}`} />
+                      <div className={`w-2 h-2 rounded-full ${player.wellness?.soreness && player.wellness.soreness >= 4 ? "bg-amber-300" : "bg-green-300"}`} />
                     </div>
                   </div>
                   {player.wellness?.notes && (
-                      <div className="ml-4 pl-2 border-l-2 border-slate-200 text-[11px] text-slate-500 italic">
-                        "{player.wellness.notes}"
-                      </div>
+                      <div className="ml-4 pl-2 border-l-2 border-slate-200 text-[11px] text-slate-500 italic truncate">"{player.wellness.notes}"</div>
                   )}
                 </div>
               ))}

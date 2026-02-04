@@ -9,6 +9,8 @@ import { useStaffData } from "./useStaffData";
 import { WellnessTab } from "./WellnessTab";
 import { RPETab } from "./RPETab";
 import { ReportsSheet } from "./ReportsSheet";
+import { PlayerDetailView } from "./PlayerDetailView"; // Importamos el nuevo componente
+import { Player } from "./types";
 
 interface StaffDashboardProps {
   onLogout: () => void;
@@ -17,14 +19,27 @@ interface StaffDashboardProps {
 export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   const [activeTab, setActiveTab] = useState("morning");
   const { players, loading, plannedRpe, selectedDate, setSelectedDate, saveTarget } = useStaffData();
+  
+  // ESTADO PARA LA NAVEGACIÓN INTERNA
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
-  // Cálculos rápidos para la cabecera
+  // SI HAY JUGADORA SELECCIONADA, MOSTRAMOS SU PÁGINA DE DETALLE
+  if (selectedPlayer) {
+    return (
+      <PlayerDetailView 
+        player={selectedPlayer} 
+        onBack={() => setSelectedPlayer(null)} 
+      />
+    );
+  }
+
+  // --- CÓDIGO DEL DASHBOARD NORMAL (Si no hay jugadora seleccionada) ---
+
   const totalPlayers = players.length;
   const completedCount = activeTab === "morning"
     ? players.filter((p) => p.wellness).length
     : players.filter((p) => p.rpe).length;
 
-  // Helpers de fecha (solo para mostrar)
   const formatDateLabel = (date: Date) => {
     const today = new Date();
     const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
@@ -108,7 +123,11 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           </TabsList>
 
           {activeTab === "morning" ? (
-            <WellnessTab players={players} loading={loading} />
+            <WellnessTab 
+              players={players} 
+              loading={loading} 
+              onPlayerClick={setSelectedPlayer} // Pasamos la función de selección
+            />
           ) : (
             <RPETab players={players} plannedRpe={plannedRpe} onSaveTarget={saveTarget} />
           )}
