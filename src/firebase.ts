@@ -15,6 +15,7 @@ const firebaseConfig = {
 };
 
 // Inicializamos Firebase
-const app = initializeApp(firebaseConfig);
+// [CORRECCIÓN]: Añadido 'export' aquí para que otros archivos puedan usar 'app'
+export const app = initializeApp(firebaseConfig);
 // Exportamos la base de datos para usarla en la app
 export const db = getFirestore(app);

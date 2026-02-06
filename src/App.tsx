@@ -9,6 +9,9 @@ import { db } from './firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
+// Importamos la lógica de notificaciones
+import { requestNotificationPermission, onMessageListener } from './notifications';
+
 type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff';
 type Role = 'player' | 'staff';
 
@@ -30,6 +33,9 @@ export default function App() {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
       
+      // Si ya estaba logueado, pedimos permiso de notificaciones de nuevo (por si cambió el token o es nuevo dispositivo)
+      requestNotificationPermission(savedUser);
+
       if (savedRole === 'staff') {
         setCurrentScreen('staff');
       } else {
@@ -37,6 +43,29 @@ export default function App() {
         checkDailyStatus(savedUser); 
       }
     }
+  }, []);
+
+  // ESCUCHAR NOTIFICACIONES EN PRIMER PLANO (FOREGROUND)
+  // Esto sirve para que si estás con la app abierta, te salga el aviso igual.
+  useEffect(() => {
+    const listenToNotifications = async () => {
+        try {
+            const payload = await onMessageListener();
+            console.log("Notificación recibida en foreground:", payload);
+            if (payload.notification) {
+                toast(payload.notification.title, {
+                    description: payload.notification.body,
+                    action: {
+                        label: "Ver",
+                        onClick: () => console.log("Click en notificación")
+                    }
+                });
+            }
+        } catch (err) {
+            console.log("Esperando notificaciones...", err);
+        }
+    };
+    listenToNotifications();
   }, []);
 
   const checkDailyStatus = async (playerName: string) => {
@@ -85,6 +114,9 @@ export default function App() {
     localStorage.setItem('alaves_user', name);
     localStorage.setItem('alaves_role', role);
     
+    // SOLICITAMOS PERMISO AL LOGUEARSE
+    requestNotificationPermission(name);
+    
     if (role === 'staff') {
       setCurrentScreen('staff');
     } else {
@@ -107,19 +139,15 @@ export default function App() {
   const handleWellnessSubmit = async (data: WellnessData) => {
     if (!currentUser) return;
     try {
-      // NUEVA FÓRMULA:
-      // Como ahora 1 es Bueno y 10 es Malo en TODOS los campos,
-      // para calcular un Score donde 10 sea Perfecto, invertimos todos los valores.
-      // (11 - valor) transforma un 1 en 10, y un 10 en 1.
+      // FÓRMULA READINESS INVERTIDA (1=Bueno, 10=Malo -> Score alto es mejor)
       const readiness = (
-        (11 - data.sleepQuality) * 0.25 +    // Sueño: 1(mejor) -> aporta 10 ptos
-        (11 - data.fatigueLevel) * 0.25 +    // Fatiga: 1(mejor) -> aporta 10 ptos
-        (11 - data.muscleSoreness) * 0.15 +  // Dolor: 1(mejor) -> aporta 10 ptos
-        (11 - data.stressLevel) * 0.20 +     // Estrés: 1(mejor) -> aporta 10 ptos
-        (11 - data.mood) * 0.15              // Humor: 1(mejor) -> aporta 10 ptos
+        (11 - data.sleepQuality) * 0.25 +    
+        (11 - data.fatigueLevel) * 0.25 +    
+        (11 - data.muscleSoreness) * 0.15 +  
+        (11 - data.stressLevel) * 0.20 +     
+        (11 - data.mood) * 0.15              
       );
 
-      // Redondeamos a 1 decimal para que quede limpio
       const finalReadiness = Math.round(readiness * 10) / 10;
 
       await addDoc(collection(db, "wellness_logs"), {
