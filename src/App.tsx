@@ -9,7 +9,7 @@ import { db } from './firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
-// Importamos la lógica de notificaciones
+// Importamos las funciones de notificaciones
 import { requestNotificationPermission, onMessageListener } from './notifications';
 
 type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff';
@@ -33,8 +33,8 @@ export default function App() {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
       
-      // Si ya estaba logueado, pedimos permiso de notificaciones de nuevo (por si cambió el token o es nuevo dispositivo)
-      requestNotificationPermission(savedUser);
+      // [IMPORTANTE 1]: Al recargar, pasamos AMBOS: usuario y rol
+      requestNotificationPermission(savedUser, savedRole);
 
       if (savedRole === 'staff') {
         setCurrentScreen('staff');
@@ -45,20 +45,15 @@ export default function App() {
     }
   }, []);
 
-  // ESCUCHAR NOTIFICACIONES EN PRIMER PLANO (FOREGROUND)
-  // Esto sirve para que si estás con la app abierta, te salga el aviso igual.
+  // ESCUCHA DE NOTIFICACIONES
   useEffect(() => {
     const listenToNotifications = async () => {
         try {
             const payload = await onMessageListener();
-            console.log("Notificación recibida en foreground:", payload);
             if (payload.notification) {
                 toast(payload.notification.title, {
                     description: payload.notification.body,
-                    action: {
-                        label: "Ver",
-                        onClick: () => console.log("Click en notificación")
-                    }
+                    duration: 5000,
                 });
             }
         } catch (err) {
@@ -114,8 +109,8 @@ export default function App() {
     localStorage.setItem('alaves_user', name);
     localStorage.setItem('alaves_role', role);
     
-    // SOLICITAMOS PERMISO AL LOGUEARSE
-    requestNotificationPermission(name);
+    // [IMPORTANTE 2]: Al hacer login, pasamos el rol (role) como segundo argumento
+    requestNotificationPermission(name, role);
     
     if (role === 'staff') {
       setCurrentScreen('staff');
@@ -139,7 +134,7 @@ export default function App() {
   const handleWellnessSubmit = async (data: WellnessData) => {
     if (!currentUser) return;
     try {
-      // FÓRMULA READINESS INVERTIDA (1=Bueno, 10=Malo -> Score alto es mejor)
+      // Cálculo del Readiness (1=Mejor, 10=Peor) -> Invertimos para el score
       const readiness = (
         (11 - data.sleepQuality) * 0.25 +    
         (11 - data.fatigueLevel) * 0.25 +    
