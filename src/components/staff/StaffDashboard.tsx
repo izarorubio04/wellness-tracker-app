@@ -1,25 +1,23 @@
 import { useState } from "react";
-import { LogOut, Activity, Calendar as CalendarIcon, ChevronDown, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Save } from "lucide-react";
+import { LogOut, Activity, Calendar as CalendarIcon, ChevronDown, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Save, Bell } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "../ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 
-// Importamos Firebase
+// Importamos Firebase y Utils
 import { db } from '../../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-
-// IMPORTANTE: Importamos XLSX para leer/escribir Excel real
 import * as XLSX from 'xlsx';
-
-// Importamos nuestros Módulos
 import { useStaffData } from "./useStaffData";
 import { WellnessTab } from "./WellnessTab";
 import { RPETab } from "./RPETab";
 import { ReportsSheet } from "./ReportsSheet";
 import { PlayerDetailView } from "./PlayerDetailView";
 import { Player } from "./types";
+import { checkNotificationHealth } from "../../notifications"; // Importamos el doctor
 
 interface StaffDashboardProps {
   onLogout: () => void;
@@ -31,10 +29,10 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showNotifHealth, setShowNotifHealth] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<any>(null);
 
   // --- LÓGICA DE EXPORTACIÓN Y ACTUALIZACIÓN ---
-
-  // 1. OBTENER DATOS DE FIREBASE (Lógica compartida)
   const fetchAllData = async () => {
     const wQuery = query(collection(db, "wellness_logs"), orderBy("timestamp", "desc"));
     const rQuery = query(collection(db, "rpe_logs"), orderBy("timestamp", "desc"));
@@ -42,7 +40,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
 
     const unifiedData: Record<string, any> = {};
     const getKey = (date: Date, name: string) => {
-      // Normalizamos fecha a YYYY-MM-DD
       const d = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
       return `${d}_${name}`; 
     };
@@ -52,12 +49,7 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       const date = new Date(d.timestamp);
       const name = d.playerName;
       const key = getKey(date, name);
-      if (!unifiedData[key]) unifiedData[key] = { 
-          ID_UNICO: key, // Usamos esto para evitar duplicados
-          Fecha: date.toLocaleDateString("es-ES"), 
-          Nombre: name, 
-          Posición: "JUG" 
-      };
+      if (!unifiedData[key]) unifiedData[key] = { ID_UNICO: key, Fecha: date.toLocaleDateString("es-ES"), Nombre: name, Posición: "JUG" };
       unifiedData[key].Sueño = d.sleepQuality;
       unifiedData[key].Fatiga = d.fatigueLevel;
       unifiedData[key].Dolor = d.muscleSoreness;
@@ -72,12 +64,7 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       const date = new Date(d.timestamp);
       const name = d.playerName;
       const key = getKey(date, name);
-      if (!unifiedData[key]) unifiedData[key] = { 
-          ID_UNICO: key,
-          Fecha: date.toLocaleDateString("es-ES"), 
-          Nombre: name, 
-          Posición: "JUG" 
-      };
+      if (!unifiedData[key]) unifiedData[key] = { ID_UNICO: key, Fecha: date.toLocaleDateString("es-ES"), Nombre: name, Posición: "JUG" };
       unifiedData[key].RPE = d.rpeValue;
       unifiedData[key].NotaRPE = d.notes;
     });
@@ -85,98 +72,68 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     return Object.values(unifiedData);
   };
 
-  // 2. ACTUALIZAR EXCEL MAESTRO (La Magia)
   const handleUpdateMasterExcel = async () => {
-    // Verificamos soporte del navegador
     if (!('showOpenFilePicker' in window)) {
-      toast.error("Tu navegador no soporta esta función. Usa Chrome o Edge.");
+      toast.error("Tu navegador no soporta esta función. Usa Chrome o Edge en PC.");
       return;
     }
-
     setIsExporting(true);
     try {
-      // A. Pedir al usuario que seleccione el archivo MAESTRO
       const [fileHandle] = await (window as any).showOpenFilePicker({
         types: [{ description: 'Excel Files', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }],
         multiple: false
       });
-
-      // B. Leer el archivo existente
       const file = await fileHandle.getFile();
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer);
-      
-      // Asumimos que los datos están en la primera hoja
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Convertir Excel existente a JSON
       const existingData: any[] = XLSX.utils.sheet_to_json(worksheet);
-      
-      // C. Obtener datos frescos de Firebase
       const firebaseData = await fetchAllData();
-
-      // D. FUSIONAR INTELIGENTE (Merge)
-      // Creamos un Set con los ID_UNICO que ya existen en el Excel para no duplicar
       const existingKeys = new Set(existingData.map((row: any) => row.ID_UNICO));
       
       let addedCount = 0;
       firebaseData.forEach((newItem: any) => {
         if (!existingKeys.has(newItem.ID_UNICO)) {
-          existingData.push(newItem); // Añadimos solo si es nuevo
+          existingData.push(newItem);
           addedCount++;
         }
       });
 
       if (addedCount === 0) {
-        toast.info("El Excel ya está actualizado. No hay datos nuevos.");
+        toast.info("El Excel ya está actualizado.");
         setIsExporting(false);
         return;
       }
 
-      // E. Escribir de nuevo al Excel (Convirtiendo JSON -> Hoja)
       const newWorksheet = XLSX.utils.json_to_sheet(existingData);
       workbook.Sheets[firstSheetName] = newWorksheet;
-      
-      // Generar el blob binario
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      
-      // F. Guardar sobre el mismo archivo
       const writable = await fileHandle.createWritable();
       await writable.write(excelBuffer);
       await writable.close();
-
-      toast.success(`¡Éxito! Se han añadido ${addedCount} filas nuevas a tu Excel.`);
-
+      toast.success(`¡Éxito! Se han añadido ${addedCount} filas.`);
     } catch (error) {
       console.error(error);
-      // Si el usuario cancela la selección, no es un error grave
-      if ((error as any).name !== 'AbortError') {
-        toast.error("Error al actualizar el Excel. Asegúrate de que no esté abierto.");
-      }
+      if ((error as any).name !== 'AbortError') toast.error("Error al actualizar el Excel.");
     } finally {
       setIsExporting(false);
     }
   };
 
-  // 3. EXPORTAR HISTÓRICO (Opción backup si no tienen Excel creado)
   const handleExportHistory = async () => {
     setIsExporting(true);
     try {
         const data = await fetchAllData();
-        // Ordenar por fecha desc
         data.sort((a: any, b: any) => {
             const dateA = a.ID_UNICO.split('_')[0];
             const dateB = b.ID_UNICO.split('_')[0];
             return dateB.localeCompare(dateA);
         });
-
-        // Generar Excel nuevo
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Datos Alaves");
         XLSX.writeFile(wb, "Alaves_MASTER_Historial.xlsx");
-        
         toast.success("Historial creado correctamente.");
     } catch (e) {
         console.error(e);
@@ -186,6 +143,18 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     }
   };
 
+  const handleExportToday = () => {
+    // Implementación simple para hoy
+    toast.info("Usa el Histórico Completo para tener todos los datos.");
+  };
+
+  // --- DIAGNÓSTICO DE NOTIFICACIONES ---
+  const runHealthCheck = async () => {
+    setHealthStatus(null);
+    setShowNotifHealth(true);
+    const status = await checkNotificationHealth();
+    setHealthStatus(status);
+  };
 
   // --- RENDER ---
   if (selectedPlayer) {
@@ -235,46 +204,42 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
             </DropdownMenu>
           </div>
           
-          {/* MENU DE EXPORTACIÓN INTELIGENTE */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button 
-                   className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none"
-                   disabled={isExporting}
-                >
-                   {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
-                   Excel
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 bg-white border-slate-200 shadow-xl">
-                <DropdownMenuLabel>Gestión de Datos</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                
-                {/* OPCIÓN 1: ACTUALIZAR EL MAESTRO */}
-                <DropdownMenuItem onClick={handleUpdateMasterExcel} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
-                    <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
-                        <RefreshCw className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <span className="block font-bold text-[#0B2149] text-xs">Actualizar Maestro</span>
-                        <span className="block text-[10px] text-slate-500">Selecciona tu archivo y añade datos</span>
-                    </div>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
+          <div className="flex items-center gap-2">
+             {/* BOTÓN DIAGNÓSTICO NOTIFICACIONES */}
+             <button 
+               onClick={runHealthCheck}
+               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-blue-200"
+               title="Diagnóstico de Notificaciones"
+             >
+                <Bell className="w-4 h-4" />
+             </button>
 
-                {/* OPCIÓN 2: CREAR NUEVO (BACKUP) */}
-                <DropdownMenuItem onClick={handleExportHistory} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
-                    <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700">
-                        <Save className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <span className="block font-bold text-[#0B2149] text-xs">Descargar Todo</span>
-                        <span className="block text-[10px] text-slate-500">Generar archivo nuevo con todo</span>
-                    </div>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+             {/* MENU EXCEL */}
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button 
+                       className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none"
+                       disabled={isExporting}
+                    >
+                       {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
+                       Excel
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 bg-white border-slate-200 shadow-xl">
+                    <DropdownMenuLabel>Gestión de Datos</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleUpdateMasterExcel} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
+                        <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><RefreshCw className="w-4 h-4" /></div>
+                        <div><span className="block font-bold text-[#0B2149] text-xs">Actualizar Maestro</span><span className="block text-[10px] text-slate-500">Añadir datos a tu Excel</span></div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleExportHistory} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
+                        <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700"><Save className="w-4 h-4" /></div>
+                        <div><span className="block font-bold text-[#0B2149] text-xs">Descargar Todo</span><span className="block text-[10px] text-slate-500">Generar archivo nuevo</span></div>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+             </DropdownMenu>
+          </div>
         </div>
 
         <div className="flex justify-between items-end">
@@ -326,6 +291,54 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           )}
         </Tabs>
       </div>
+
+      {/* MODAL DE DIAGNÓSTICO */}
+      <Dialog open={showNotifHealth} onOpenChange={setShowNotifHealth}>
+        <DialogContent className="bg-white text-slate-900">
+            <DialogHeader>
+                <DialogTitle>Diagnóstico de Notificaciones</DialogTitle>
+                <DialogDescription>
+                    Estado de la conexión push en este dispositivo.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                {!healthStatus ? (
+                    <div className="text-center py-4">Comprobando...</div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-sm font-bold">Permiso Navegador:</span>
+                            <span className={`text-xs px-2 py-1 rounded ${healthStatus.permission === 'granted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {healthStatus.permission}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-sm font-bold">Acceso a Service Worker:</span>
+                            <span className={`text-xs px-2 py-1 rounded ${healthStatus.swStatus === 'OK' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {healthStatus.swStatus}
+                            </span>
+                        </div>
+                        <div className="border-b pb-2">
+                            <span className="text-sm font-bold block mb-1">Token FCM:</span>
+                            {healthStatus.token ? (
+                                <p className="text-[10px] font-mono bg-slate-100 p-2 rounded break-all">{healthStatus.token.substring(0, 20)}...</p>
+                            ) : (
+                                <p className="text-xs text-red-500">No se pudo obtener token</p>
+                            )}
+                        </div>
+                        {healthStatus.swStatus !== 'OK' && (
+                            <div className="bg-red-50 border border-red-200 p-3 rounded text-xs text-red-700">
+                                <strong>⚠️ Problema detectado:</strong><br/>
+                                El archivo 'firebase-messaging-sw.js' está bloqueado (Error 401). 
+                                <br/><br/>
+                                <strong>Solución:</strong> Ve a Vercel {'>'} Settings {'>'} Deployment Protection y desactiva "Vercel Authentication".
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
