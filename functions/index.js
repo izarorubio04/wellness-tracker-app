@@ -2,74 +2,90 @@ const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
-// 1. RECORDATORIO DIARIO (Cron Job)
-// Se ejecuta todos los días a las 10:00 AM (hora peninsular)
+// 1. RECORDATORIO DIARIO
 exports.dailyWellnessReminder = functions.pubsub
-  .schedule("35 23 * * *")
+  .schedule("0 10 * * *")
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // a. Obtener quién ha rellenado hoy
-    const logsSnapshot = await db
-      .collection("wellness_logs")
-      .where("timestamp", ">=", today.getTime())
-      .get();
-    
-    const submittedPlayers = new Set();
-    logsSnapshot.forEach(doc => submittedPlayers.add(doc.data().playerName));
-
-    // b. Obtener todos los usuarios tipo 'player'
-    const usersSnapshot = await db.collection("users").where("role", "==", "player").get();
-
-    const tokensToSend = [];
-
-    usersSnapshot.forEach(doc => {
-      const userData = doc.data();
-      // Si NO ha entregado y tiene tokens de notificación
-      if (!submittedPlayers.has(userData.name) && userData.fcmTokens && userData.fcmTokens.length > 0) {
-        tokensToSend.push(...userData.fcmTokens);
-      }
-    });
-
-    if (tokensToSend.length === 0) return null;
-
-    // c. Enviar mensaje masivo
-    const message = {
-      notification: {
-        title: "¡Buenos días, Gloriosa!",
-        body: "No olvides registrar tu Wellness antes del entrenamiento 📝",
-      },
-      tokens: tokensToSend,
-    };
-
     try {
+      const logsSnapshot = await db
+        .collection("wellness_logs")
+        .where("timestamp", ">=", today.getTime())
+        .get();
+      
+      const submittedPlayers = new Set();
+      logsSnapshot.forEach(doc => submittedPlayers.add(doc.data().playerName));
+
+      const usersSnapshot = await db.collection("users").where("role", "==", "player").get();
+      const tokensToSend = [];
+
+      usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        if (!submittedPlayers.has(userData.name) && userData.fcmTokens && userData.fcmTokens.length > 0) {
+          tokensToSend.push(...userData.fcmTokens);
+        }
+      });
+
+      if (tokensToSend.length === 0) {
+        functions.logger.info("Recordatorio diario: Nada que enviar (todos cumplieron o sin tokens)");
+        return null;
+      }
+
+      const message = {
+        notification: {
+          title: "¡Buenos días, Gloriosa!",
+          body: "No olvides registrar tu Wellness antes del entrenamiento 📝",
+        },
+        tokens: tokensToSend,
+      };
+
       const response = await admin.messaging().sendMulticast(message);
-      console.log("Recordatorios enviados:", response.successCount);
+      functions.logger.info("Recordatorios enviados correctamente:", response.successCount);
+      if (response.failureCount > 0) {
+         functions.logger.warn("Fallaron algunos envíos:", response.failureCount);
+      }
     } catch (error) {
-      console.error("Error enviando recordatorios:", error);
+      functions.logger.error("Error crítico enviando recordatorios:", error);
     }
+    return null;
   });
 
 
 // 2. ALERTA AL STAFF (Trigger Firestore)
-// Se dispara cada vez que alguien crea un nuevo log de wellness
 exports.checkWellnessRisk = functions.firestore
   .document("wellness_logs/{docId}")
   .onCreate(async (snap, context) => {
     const data = snap.data();
     
-    // Lógica: 1=Mejor, 10=Peor. >=8 es Riesgo.
-    const isRisk = 
-      data.fatigueLevel >= 8 || 
-      data.sleepQuality >= 8 || 
-      data.muscleSoreness >= 8 || 
-      data.stressLevel >= 8 || 
-      data.mood >= 8;
+    // --- DIAGNÓSTICO: Ver qué datos llegan ---
+    functions.logger.info("Nuevo Wellness recibido de:", data.playerName);
+    functions.logger.info("Valores:", {
+        fatiga: data.fatigueLevel,
+        sueño: data.sleepQuality,
+        dolor: data.muscleSoreness,
+        estrés: data.stressLevel,
+        animo: data.mood
+    });
 
-    if (!isRisk) return null;
+    // Lógica: 1=Mejor, 10=Peor. >=8 es Riesgo.
+    // Usamos Number() para asegurar que no sean textos
+    const isRisk = 
+      Number(data.fatigueLevel) >= 8 || 
+      Number(data.sleepQuality) >= 8 || 
+      Number(data.muscleSoreness) >= 8 || 
+      Number(data.stressLevel) >= 8 || 
+      Number(data.mood) >= 8;
+
+    if (!isRisk) {
+        functions.logger.info("✅ No se detectó riesgo (Valores < 8). Saliendo.");
+        return null;
+    }
+
+    functions.logger.info("⚠️ ¡RIESGO DETECTADO! Buscando Staff...");
 
     // Si hay riesgo, buscamos a TODOS los del staff
     const db = admin.firestore();
@@ -80,10 +96,17 @@ exports.checkWellnessRisk = functions.firestore
       const d = doc.data();
       if (d.fcmTokens && d.fcmTokens.length > 0) {
         staffTokens.push(...d.fcmTokens);
+      } else {
+        functions.logger.warn(`Staff encontrado (${doc.id}) pero SIN TOKENS.`);
       }
     });
 
-    if (staffTokens.length === 0) return null;
+    if (staffTokens.length === 0) {
+        functions.logger.error("❌ ERROR: Hay riesgo pero no encontré ningún token de Staff válido.");
+        return null;
+    }
+
+    functions.logger.info(`Enviando alerta a ${staffTokens.length} dispositivos de Staff...`);
 
     const message = {
       notification: {
@@ -94,9 +117,13 @@ exports.checkWellnessRisk = functions.firestore
     };
 
     try {
-      await admin.messaging().sendMulticast(message);
-      console.log("Alerta enviada al staff");
+      const response = await admin.messaging().sendMulticast(message);
+      functions.logger.info("📨 Notificación enviada. Éxitos:", response.successCount);
+      
+      if (response.failureCount > 0) {
+          functions.logger.error("Hubo fallos al enviar:", response.responses);
+      }
     } catch (error) {
-      console.error("Error enviando alerta:", error);
+      functions.logger.error("Error fatal enviando la alerta:", error);
     }
   });
