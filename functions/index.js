@@ -5,7 +5,7 @@ admin.initializeApp();
 // 1. RECORDATORIO DIARIO (Cron Job)
 // Se ejecuta todos los días a las 10:00 AM (hora peninsular)
 exports.dailyWellnessReminder = functions.pubsub
-  .schedule("0 10 * * *")
+  .schedule("30 23 * * *")
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
