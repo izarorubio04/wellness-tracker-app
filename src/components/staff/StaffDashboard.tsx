@@ -15,6 +15,7 @@ import { RPETab } from "./RPETab";
 import { ReportsSheet } from "./ReportsSheet";
 import { PlayerDetailView } from "./PlayerDetailView";
 import { Player } from "./types";
+import { WeeklyCalendar } from '../calendar/WeeklyCalendar';
 
 interface StaffDashboardProps {
   onLogout: () => void;
@@ -187,8 +188,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           </div>
           
           <div className="flex items-center gap-2">
-             {/* AQUÍ ESTABA LA CAMPANITA - YA NO ESTÁ */}
-
              {/* MENU EXCEL */}
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -250,19 +249,28 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
       {/* --- CONTENIDO --- */}
       <div className="px-4 -mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full bg-white p-1 rounded-xl shadow-lg border border-slate-100 h-14 grid grid-cols-2">
-            <TabsTrigger value="morning" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600">Wellness</TabsTrigger>
-            <TabsTrigger value="session" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600">RPE</TabsTrigger>
+          <TabsList className="w-full bg-white p-1 rounded-xl shadow-lg border border-slate-100 h-14 grid grid-cols-3">
+            <TabsTrigger value="morning" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">Wellness</TabsTrigger>
+            <TabsTrigger value="session" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">RPE</TabsTrigger>
+            <TabsTrigger value="calendar" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">Calendario</TabsTrigger>
           </TabsList>
 
-          {activeTab === "morning" ? (
+          {activeTab === "morning" && (
             <WellnessTab 
               players={players} 
               loading={loading} 
               onPlayerClick={setSelectedPlayer} 
             />
-          ) : (
+          )}
+          
+          {activeTab === "session" && (
             <RPETab players={players} plannedRpe={plannedRpe} onSaveTarget={saveTarget} />
+          )}
+
+          {activeTab === "calendar" && (
+            <div className="mt-4">
+                <WeeklyCalendar isStaff={true} />
+            </div>
           )}
         </Tabs>
       </div>

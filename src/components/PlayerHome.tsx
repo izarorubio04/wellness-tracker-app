@@ -2,8 +2,8 @@ import { Calendar, Activity, TrendingUp, Check, Settings, LogOut } from 'lucide-
 
 interface PlayerHomeProps {
   playerName: string;
-  onNavigate: (screen: 'wellness' | 'rpe' | 'player-home' | 'settings') => void;
-  onLogout: () => void; // <--- AÑADIDO: Recibimos la función de cerrar sesión
+  onNavigate: (screen: 'wellness' | 'rpe' | 'player-home' | 'settings' | 'calendar') => void;
+  onLogout: () => void; 
   wellnessCompleted: boolean;
   rpeCompleted: boolean;
   weeklyReadiness: number;
@@ -29,9 +29,8 @@ export function PlayerHome({
           <p className="text-blue-200">Deportivo Alavés</p>
         </div>
         
-        {/* BOTONES DE ACCIÓN (Agrupados) */}
+        {/* BOTONES DE ACCIÓN */}
         <div className="flex gap-3">
-          {/* Botón Ajustes */}
           <button 
             onClick={() => onNavigate('settings')}
             className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all"
@@ -40,7 +39,6 @@ export function PlayerHome({
             <Settings className="w-5 h-5" />
           </button>
 
-          {/* Botón Logout */}
           <button 
             onClick={onLogout}
             className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-red-200 hover:bg-red-500/20 hover:text-white active:scale-95 transition-all"
@@ -51,7 +49,7 @@ export function PlayerHome({
         </div>
       </div>
 
-      {/* Action Card - Daily Wellness */}
+      {/* Wellness Card */}
       {!wellnessCompleted && (
         <div className="mx-6 mb-6">
           <button
@@ -72,7 +70,7 @@ export function PlayerHome({
         </div>
       )}
 
-      {/* Wellness Completado (Estado Verde) */}
+      {/* Wellness Completado */}
       {wellnessCompleted && (
         <div className="mx-6 mb-6">
           <div className="w-full bg-[#10B981] rounded-2xl p-6 shadow-lg border border-green-400/50">
@@ -89,7 +87,7 @@ export function PlayerHome({
         </div>
       )}
 
-      {/* Weekly Readiness Widget */}
+      {/* Readiness Widget */}
       <div className="mx-6 mb-6">
         <div className="bg-white rounded-2xl p-6 shadow-lg">
           <h3 className="text-lg font-bold mb-6 text-[#0B2149]">Estado de la Semana</h3>
@@ -135,7 +133,7 @@ export function PlayerHome({
         </div>
       </div>
 
-      {/* Quick Access Grid */}
+      {/* Quick Access */}
       <div className="mx-6">
         <h3 className="text-white font-bold mb-4 ml-1">Acceso Rápido</h3>
         <div className="grid grid-cols-2 gap-4">
@@ -155,7 +153,10 @@ export function PlayerHome({
             </h4>
           </button>
 
-          <button className="bg-white/10 backdrop-blur-md rounded-2xl p-6 active:scale-95 transition-all border border-white/10 hover:bg-white/15">
+          <button 
+            onClick={() => onNavigate('calendar')}
+            className="bg-white/10 backdrop-blur-md rounded-2xl p-6 active:scale-95 transition-all border border-white/10 hover:bg-white/15"
+          >
             <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-3">
               <Calendar className="w-6 h-6 text-white" />
             </div>

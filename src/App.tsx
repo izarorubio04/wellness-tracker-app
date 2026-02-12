@@ -5,15 +5,15 @@ import { RPEForm } from './components/RPEForm';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { Login } from './components/Login';
 import { NotificationSettings } from './components/NotificationSettings';
-// Nota: LogOut ya no se usa aquí directamente, pero lo dejo por si acaso lo reusas, o puedes borrar el import.
-// import { LogOut } from 'lucide-react'; 
+import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
+import { ChevronLeft } from 'lucide-react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
 import { requestNotificationPermission, onMessageListener } from './notifications';
 
-type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff' | 'settings';
+type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff' | 'settings' | 'calendar';
 type Role = 'player' | 'staff';
 
 export default function App() {
@@ -200,13 +200,13 @@ export default function App() {
     <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
       <Toaster position="top-center" />
 
-      {/* Aquí estaba antes el botón flotante, ahora lo hemos eliminado */}
+      {/* PANTALLAS */}
 
       {currentScreen === 'player-home' && (
         <PlayerHome
           playerName={currentUser}
           onNavigate={setCurrentScreen}
-          onLogout={handleLogout} // Pasamos la función aquí
+          onLogout={handleLogout} 
           wellnessCompleted={wellnessCompleted}
           rpeCompleted={rpeCompleted}
           weeklyReadiness={weeklyReadiness}
@@ -218,6 +218,24 @@ export default function App() {
           playerName={currentUser}
           onBack={() => setCurrentScreen('player-home')}
         />
+      )}
+
+      {currentScreen === 'calendar' && (
+        <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+            <div className="bg-white p-4 shadow-sm flex items-center gap-3 sticky top-0 z-10">
+                <button 
+                    onClick={() => setCurrentScreen('player-home')}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200"
+                >
+                    <ChevronLeft className="w-5 h-5 text-[#0B2149]" />
+                </button>
+                <h1 className="text-xl font-bold text-[#0B2149]">Agenda Semanal</h1>
+            </div>
+            
+            <div className="flex-1">
+                <WeeklyCalendar isStaff={false} />
+            </div>
+        </div>
       )}
 
       {currentScreen === 'wellness' && (
