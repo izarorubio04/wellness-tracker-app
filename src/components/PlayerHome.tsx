@@ -1,18 +1,20 @@
-import { Calendar, Activity, TrendingUp, Check } from 'lucide-react'; // <--- Añado Check
+import { Calendar, Activity, TrendingUp, Check, Settings, LogOut } from 'lucide-react';
 
 interface PlayerHomeProps {
   playerName: string;
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: 'wellness' | 'rpe' | 'player-home' | 'settings') => void;
+  onLogout: () => void; // <--- AÑADIDO: Recibimos la función de cerrar sesión
   wellnessCompleted: boolean;
-  rpeCompleted: boolean; // <--- NUEVA PROP
+  rpeCompleted: boolean;
   weeklyReadiness: number;
 }
 
 export function PlayerHome({ 
   playerName, 
-  onNavigate, 
+  onNavigate,
+  onLogout, 
   wellnessCompleted, 
-  rpeCompleted, // <--- Recibimos el estado
+  rpeCompleted, 
   weeklyReadiness 
 }: PlayerHomeProps) {
   const readinessPercentage = (weeklyReadiness / 10) * 100;
@@ -21,9 +23,32 @@ export function PlayerHome({
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] pb-24">
       {/* Header */}
-      <div className="px-6 pt-12 pb-8">
-        <h1 className="text-white text-3xl mb-2">Hola, {playerName}</h1>
-        <p className="text-blue-200">Deportivo Alavés</p>
+      <div className="px-6 pt-12 pb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-white text-3xl mb-2 font-bold">Hola, {playerName.split(' ')[0]}</h1>
+          <p className="text-blue-200">Deportivo Alavés</p>
+        </div>
+        
+        {/* BOTONES DE ACCIÓN (Agrupados) */}
+        <div className="flex gap-3">
+          {/* Botón Ajustes */}
+          <button 
+            onClick={() => onNavigate('settings')}
+            className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all"
+            aria-label="Ajustes"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+
+          {/* Botón Logout */}
+          <button 
+            onClick={onLogout}
+            className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center text-red-200 hover:bg-red-500/20 hover:text-white active:scale-95 transition-all"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Action Card - Daily Wellness */}
@@ -34,29 +59,30 @@ export function PlayerHome({
             className="w-full bg-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform"
           >
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-[#0B2149] to-[#1a3a6b] rounded-full flex items-center justify-center">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#0B2149] to-[#1a3a6b] rounded-full flex items-center justify-center shadow-md">
                 <Activity className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <h3 className="text-lg mb-1 text-[#0B2149]">Completa tu Wellness</h3>
-                <p className="text-sm text-[#64748B]">Ayúdanos a cuidar de ti</p>
+                <h3 className="text-lg font-bold mb-1 text-[#0B2149]">Completa tu Wellness</h3>
+                <p className="text-sm text-slate-500">Ayúdanos a cuidar de ti</p>
               </div>
-              <div className="text-3xl">→</div>
+              <div className="text-3xl text-slate-300">→</div>
             </div>
           </button>
         </div>
       )}
 
+      {/* Wellness Completado (Estado Verde) */}
       {wellnessCompleted && (
         <div className="mx-6 mb-6">
-          <div className="w-full bg-[#10B981] rounded-2xl p-6 shadow-lg">
+          <div className="w-full bg-[#10B981] rounded-2xl p-6 shadow-lg border border-green-400/50">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
                 <Check className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <h3 className="text-lg mb-1 text-white">✓ Wellness Completado</h3>
-                <p className="text-sm text-white/80">¡Gracias por tu feedback!</p>
+                <h3 className="text-lg font-bold mb-1 text-white">Wellness Enviado</h3>
+                <p className="text-sm text-green-50">¡Gracias por tu feedback!</p>
               </div>
             </div>
           </div>
@@ -66,7 +92,7 @@ export function PlayerHome({
       {/* Weekly Readiness Widget */}
       <div className="mx-6 mb-6">
         <div className="bg-white rounded-2xl p-6 shadow-lg">
-          <h3 className="text-lg mb-6 text-[#0B2149]">Estado de la Semana</h3>
+          <h3 className="text-lg font-bold mb-6 text-[#0B2149]">Estado de la Semana</h3>
           <div className="flex items-center gap-6">
             <div className="relative w-32 h-32">
               <svg className="w-32 h-32 transform -rotate-90">
@@ -80,27 +106,28 @@ export function PlayerHome({
                   fill="none"
                   strokeDasharray={`${(readinessPercentage / 100) * 351.86} 351.86`}
                   strokeLinecap="round"
+                  className="transition-all duration-1000 ease-out"
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-3xl" style={{ color: readinessColor }}>{weeklyReadiness.toFixed(1)}</div>
-                <div className="text-xs text-[#64748B]">/ 10</div>
+                <div className="text-3xl font-bold" style={{ color: readinessColor }}>{weeklyReadiness.toFixed(1)}</div>
+                <div className="text-xs text-slate-400 font-medium">/ 10</div>
               </div>
             </div>
             <div className="flex-1">
               <div className="mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: readinessColor }}></div>
-                  <span className="text-sm">
+                  <span className="text-sm font-bold text-slate-700">
                     {weeklyReadiness >= 7 ? 'Óptimo' : weeklyReadiness >= 5 ? 'Moderado' : 'Precaución'}
                   </span>
                 </div>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   {weeklyReadiness >= 7 
-                    ? 'Tu cuerpo está listo para el entrenamiento' 
+                    ? 'Tu cuerpo está listo para rendir al máximo nivel.' 
                     : weeklyReadiness >= 5 
-                    ? 'Monitorea tu recuperación' 
-                    : 'Considera descanso adicional'}
+                    ? 'Monitoriza tu carga y prioriza el descanso hoy.' 
+                    : 'Es recomendable hablar con el fisio antes de entrenar.'}
                 </p>
               </div>
             </div>
@@ -108,31 +135,31 @@ export function PlayerHome({
         </div>
       </div>
 
-      {/* Quick Access */}
+      {/* Quick Access Grid */}
       <div className="mx-6">
-        <h3 className="text-white mb-4">Acceso Rápido</h3>
+        <h3 className="text-white font-bold mb-4 ml-1">Acceso Rápido</h3>
         <div className="grid grid-cols-2 gap-4">
-          
-          {/* BOTÓN RPE MODIFICADO */}
           <button
             onClick={() => onNavigate('rpe')}
-            className={`backdrop-blur-sm rounded-2xl p-6 active:scale-95 transition-transform ${
-              rpeCompleted ? 'bg-[#10B981]' : 'bg-white/10'
+            className={`backdrop-blur-md rounded-2xl p-6 active:scale-95 transition-all border ${
+              rpeCompleted 
+                ? 'bg-[#10B981] border-green-400/50 shadow-lg shadow-green-900/20' 
+                : 'bg-white/10 border-white/10 hover:bg-white/15'
             }`}
           >
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${rpeCompleted ? 'bg-white/20' : 'bg-white/10'}`}>
               {rpeCompleted ? <Check className="w-6 h-6 text-white" /> : <TrendingUp className="w-6 h-6 text-white" />}
             </div>
-            <h4 className="text-white text-sm">
-              {rpeCompleted ? 'RPE Enviado' : 'RPE Post-Entreno'}
+            <h4 className="text-white text-sm font-medium text-left">
+              {rpeCompleted ? 'RPE Guardado' : 'RPE Post-Entreno'}
             </h4>
           </button>
 
-          <button className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 active:scale-95 transition-transform">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
+          <button className="bg-white/10 backdrop-blur-md rounded-2xl p-6 active:scale-95 transition-all border border-white/10 hover:bg-white/15">
+            <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-3">
               <Calendar className="w-6 h-6 text-white" />
             </div>
-            <h4 className="text-white text-sm">Calendario</h4>
+            <h4 className="text-white text-sm font-medium text-left">Calendario</h4>
           </button>
         </div>
       </div>

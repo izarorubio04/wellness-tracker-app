@@ -4,15 +4,16 @@ import { DailyWellness, WellnessData } from './components/DailyWellness';
 import { RPEForm } from './components/RPEForm';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { Login } from './components/Login';
-import { LogOut } from 'lucide-react';
+import { NotificationSettings } from './components/NotificationSettings';
+// Nota: LogOut ya no se usa aquí directamente, pero lo dejo por si acaso lo reusas, o puedes borrar el import.
+// import { LogOut } from 'lucide-react'; 
 import { db } from './firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { Toaster, toast } from 'sonner';
 
-// Importamos las funciones de notificaciones
 import { requestNotificationPermission, onMessageListener } from './notifications';
 
-type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff';
+type Screen = 'player-home' | 'wellness' | 'rpe' | 'staff' | 'settings';
 type Role = 'player' | 'staff';
 
 export default function App() {
@@ -20,7 +21,6 @@ export default function App() {
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('player-home');
   
-  // ESTADOS DE COMPLETADO
   const [wellnessCompleted, setWellnessCompleted] = useState(false);
   const [rpeCompleted, setRpeCompleted] = useState(false);
   const [weeklyReadiness, setWeeklyReadiness] = useState(7.5);
@@ -33,7 +33,6 @@ export default function App() {
       setCurrentUser(savedUser);
       setUserRole(savedRole);
       
-      // [IMPORTANTE 1]: Al recargar, pasamos AMBOS: usuario y rol
       requestNotificationPermission(savedUser, savedRole);
 
       if (savedRole === 'staff') {
@@ -45,7 +44,6 @@ export default function App() {
     }
   }, []);
 
-  // ESCUCHA DE NOTIFICACIONES
   useEffect(() => {
     const listenToNotifications = async () => {
         try {
@@ -109,7 +107,6 @@ export default function App() {
     localStorage.setItem('alaves_user', name);
     localStorage.setItem('alaves_role', role);
     
-    // [IMPORTANTE 2]: Al hacer login, pasamos el rol (role) como segundo argumento
     requestNotificationPermission(name, role);
     
     if (role === 'staff') {
@@ -134,7 +131,6 @@ export default function App() {
   const handleWellnessSubmit = async (data: WellnessData) => {
     if (!currentUser) return;
     try {
-      // Cálculo del Readiness (1=Mejor, 10=Peor) -> Invertimos para el score
       const readiness = (
         (11 - data.sleepQuality) * 0.25 +    
         (11 - data.fatigueLevel) * 0.25 +    
@@ -204,24 +200,23 @@ export default function App() {
     <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
       <Toaster position="top-center" />
 
-      {currentScreen === 'player-home' && (
-        <div className="fixed top-6 right-6 z-50">
-          <button
-              onClick={handleLogout}
-              className="w-10 h-10 bg-white/80 backdrop-blur rounded-full shadow-sm flex items-center justify-center active:scale-95 text-red-400 border border-red-50"
-          >
-              <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {/* Aquí estaba antes el botón flotante, ahora lo hemos eliminado */}
 
       {currentScreen === 'player-home' && (
         <PlayerHome
           playerName={currentUser}
           onNavigate={setCurrentScreen}
+          onLogout={handleLogout} // Pasamos la función aquí
           wellnessCompleted={wellnessCompleted}
           rpeCompleted={rpeCompleted}
           weeklyReadiness={weeklyReadiness}
+        />
+      )}
+
+      {currentScreen === 'settings' && (
+        <NotificationSettings 
+          playerName={currentUser}
+          onBack={() => setCurrentScreen('player-home')}
         />
       )}
 
