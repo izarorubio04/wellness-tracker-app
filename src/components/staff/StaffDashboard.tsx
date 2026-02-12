@@ -1,15 +1,13 @@
-import { useState, useEffect } from "react";
-import { LogOut, Activity, Calendar as CalendarIcon, ChevronDown, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Save, Bell, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+import { LogOut, Activity, Calendar as CalendarIcon, ChevronDown, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Save } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "../ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Button } from "../ui/button";
-import { toast } from "sonner";
+import { Toaster, toast } from "sonner";
 
 // Importamos Firebase y Utils
 import { db } from '../../firebase';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { useStaffData } from "./useStaffData";
 import { WellnessTab } from "./WellnessTab";
@@ -17,7 +15,6 @@ import { RPETab } from "./RPETab";
 import { ReportsSheet } from "./ReportsSheet";
 import { PlayerDetailView } from "./PlayerDetailView";
 import { Player } from "./types";
-import { checkNotificationHealth } from "../../notifications"; 
 
 interface StaffDashboardProps {
   onLogout: () => void;
@@ -29,11 +26,8 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
   
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [showNotifHealth, setShowNotifHealth] = useState(false);
-  const [healthStatus, setHealthStatus] = useState<any>(null);
-  const [dbUserStatus, setDbUserStatus] = useState<any>(null); // Nuevo estado para datos de DB
 
-  // --- LÓGICA DE EXPORTACIÓN (Igual que antes) ---
+  // --- LÓGICA DE EXPORTACIÓN ---
   const fetchAllData = async () => {
     const wQuery = query(collection(db, "wellness_logs"), orderBy("timestamp", "desc"));
     const rQuery = query(collection(db, "rpe_logs"), orderBy("timestamp", "desc"));
@@ -144,29 +138,6 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
     }
   };
 
-  // --- DIAGNÓSTICO DE NOTIFICACIONES MEJORADO ---
-  const runHealthCheck = async () => {
-    setHealthStatus(null);
-    setDbUserStatus(null);
-    setShowNotifHealth(true);
-    
-    // 1. Chequeo local (Navegador)
-    const status = await checkNotificationHealth();
-    setHealthStatus(status);
-
-    // 2. Chequeo remoto (Base de Datos) - ¿Cómo me ve el servidor?
-    try {
-        const userDoc = await getDoc(doc(db, "users", "Mister")); // Asumimos que eres Mister
-        if (userDoc.exists()) {
-            setDbUserStatus(userDoc.data());
-        } else {
-            setDbUserStatus({ error: "No existes en la BD" });
-        }
-    } catch (e) {
-        setDbUserStatus({ error: "Error leyendo BD" });
-    }
-  };
-
   // --- RENDER ---
   if (selectedPlayer) {
     return <PlayerDetailView player={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
@@ -216,19 +187,15 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           </div>
           
           <div className="flex items-center gap-2">
-             {/* BOTÓN CAMPANA */}
-             <button 
-               onClick={runHealthCheck}
-               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-blue-200 relative"
-             >
-                <Bell className="w-4 h-4" />
-                {/* Puntito rojo si algo va mal (simulado) */}
-             </button>
+             {/* AQUÍ ESTABA LA CAMPANITA - YA NO ESTÁ */}
 
              {/* MENU EXCEL */}
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none" disabled={isExporting}>
+                    <button 
+                       className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none"
+                       disabled={isExporting}
+                    >
                        {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
                        Excel
                     </button>
@@ -257,7 +224,7 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
               <Activity className="w-3 h-3" /> {loading ? "Cargando..." : `Resumen del ${formatDateLabel(selectedDate)}`}
             </p>
           </div>
-          {/* SHEET REPORTES */}
+
           <Sheet>
             <SheetTrigger asChild>
               <button className="text-right group active:scale-95 transition-transform bg-white/5 p-2 pr-3 rounded-lg border border-white/10 hover:bg-white/10">
@@ -289,80 +256,16 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
           </TabsList>
 
           {activeTab === "morning" ? (
-            <WellnessTab players={players} loading={loading} onPlayerClick={setSelectedPlayer} />
+            <WellnessTab 
+              players={players} 
+              loading={loading} 
+              onPlayerClick={setSelectedPlayer} 
+            />
           ) : (
             <RPETab players={players} plannedRpe={plannedRpe} onSaveTarget={saveTarget} />
           )}
         </Tabs>
       </div>
-
-      {/* MODAL DE DIAGNÓSTICO AVANZADO */}
-      <Dialog open={showNotifHealth} onOpenChange={setShowNotifHealth}>
-        <DialogContent className="bg-white text-slate-900">
-            <DialogHeader>
-                <DialogTitle>Diagnóstico de Notificaciones</DialogTitle>
-                <DialogDescription>Revisión técnica de permisos y base de datos.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-                
-                {/* 1. CHEQUEO NAVEGADOR */}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">1. Dispositivo Local</h4>
-                    {!healthStatus ? <span className="text-xs">Cargando...</span> : (
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                                <span>Permisos:</span>
-                                <span className={healthStatus.permission === 'granted' ? 'text-green-600 font-bold' : 'text-red-600'}>{healthStatus.permission}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span>Service Worker:</span>
-                                <span className={healthStatus.swStatus === 'OK' ? 'text-green-600 font-bold' : 'text-red-600'}>{healthStatus.swStatus}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* 2. CHEQUEO NUBE */}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">2. Identidad en Base de Datos</h4>
-                    {!dbUserStatus ? <span className="text-xs">Consultando nube...</span> : (
-                        <div className="space-y-1">
-                            {dbUserStatus.error ? (
-                                <p className="text-red-500 text-sm font-bold">{dbUserStatus.error}</p>
-                            ) : (
-                                <>
-                                    <div className="flex justify-between text-sm">
-                                        <span>Rol Guardado:</span>
-                                        <span className={`font-bold px-2 rounded ${dbUserStatus.role === 'staff' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {dbUserStatus.role || 'Sin rol'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm mt-1">
-                                        <span>Dispositivos conectados:</span>
-                                        <span className="font-mono">{dbUserStatus.fcmTokens?.length || 0}</span>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* 3. ALERTA DE ERROR */}
-                {dbUserStatus && dbUserStatus.role !== 'staff' && (
-                    <div className="flex items-start gap-3 bg-red-50 text-red-800 p-3 rounded-lg text-xs border border-red-200">
-                        <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                        <div>
-                            <strong>¡Error encontrado!</strong><br/>
-                            Tu usuario en la base de datos no es "staff" (es "{dbUserStatus.role}").<br/>
-                            Por eso no te llegan los avisos.<br/>
-                            <strong>Solución:</strong> Cierra sesión y vuelve a entrar.
-                        </div>
-                    </div>
-                )}
-
-            </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
