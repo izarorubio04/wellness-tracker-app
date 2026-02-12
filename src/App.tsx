@@ -187,9 +187,15 @@ export default function App() {
     );
   }
 
+  // --- LOGICA RESPONSIVA AQUÍ ---
+  // Si es staff, usamos layout completo. Si es jugador, mantenemos max-w-md (movil).
+  const layoutClass = userRole === 'staff' 
+    ? "min-h-screen bg-[#F8FAFC]" // Staff: Pantalla completa
+    : "max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]"; // Player: Móvil centrado
+
   if (userRole === 'staff') {
     return (
-      <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
+      <div className={layoutClass}>
         <Toaster position="top-center" />
         <StaffDashboard onLogout={handleLogout} />
       </div>
@@ -197,7 +203,7 @@ export default function App() {
   }
 
   return (
-    <div className="max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]">
+    <div className={layoutClass}>
       <Toaster position="top-center" />
 
       {/* PANTALLAS */}

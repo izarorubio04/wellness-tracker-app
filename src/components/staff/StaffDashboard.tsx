@@ -15,7 +15,7 @@ import { RPETab } from "./RPETab";
 import { ReportsSheet } from "./ReportsSheet";
 import { PlayerDetailView } from "./PlayerDetailView";
 import { Player } from "./types";
-import { WeeklyCalendar } from '../calendar/WeeklyCalendar';
+import { WeeklyCalendar } from '../calendar/WeeklyCalendar'; 
 
 interface StaffDashboardProps {
   onLogout: () => void;
@@ -160,118 +160,123 @@ export function StaffDashboard({ onLogout }: StaffDashboardProps) {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-8">
-      {/* Header */}
-      <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-8 text-white shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button onClick={onLogout} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 transition-colors active:scale-95">
-              <LogOut className="w-5 h-5" />
-            </button>
+      {/* Header Responsivo */}
+      <div className="bg-gradient-to-b from-[#0B2149] to-[#1a3a6b] px-6 pt-12 pb-16 text-white shadow-xl">
+        {/* Contenedor limitado para pantallas grandes */}
+        <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-3">
+                <button onClick={onLogout} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 transition-colors active:scale-95">
+                <LogOut className="w-5 h-5" />
+                </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger className="outline-none">
-                <div className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full cursor-pointer border border-white/10">
-                  <CalendarIcon className="w-4 h-4 text-blue-200" />
-                  <span className="font-medium text-sm">{formatDateLabel(selectedDate)}</span>
-                  <ChevronDown className="w-4 h-4 opacity-50" />
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 bg-white text-slate-900 border border-slate-200 shadow-lg z-50 p-1">
-                {previousDays.map((date, idx) => (
-                  <DropdownMenuItem key={idx} onClick={() => setSelectedDate(date)} className="cursor-pointer gap-2 hover:bg-slate-100 text-slate-700">
-                    {date.getDate() === selectedDate.getDate() && <CheckCircle2 className="w-4 h-4 text-[#0B2149]" />}
-                    <span className={date.getDate() === selectedDate.getDate() ? "font-bold text-[#0B2149]" : ""}>{formatDateLabel(date)}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          
-          <div className="flex items-center gap-2">
-             {/* MENU EXCEL */}
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button 
-                       className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none"
-                       disabled={isExporting}
-                    >
-                       {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
-                       Excel
-                    </button>
+                <DropdownMenu>
+                <DropdownMenuTrigger className="outline-none">
+                    <div className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full cursor-pointer border border-white/10">
+                    <CalendarIcon className="w-4 h-4 text-blue-200" />
+                    <span className="font-medium text-sm">{formatDateLabel(selectedDate)}</span>
+                    <ChevronDown className="w-4 h-4 opacity-50" />
+                    </div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 bg-white border-slate-200 shadow-xl">
-                    <DropdownMenuLabel>Gestión de Datos</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleUpdateMasterExcel} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
-                        <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><RefreshCw className="w-4 h-4" /></div>
-                        <div><span className="block font-bold text-[#0B2149] text-xs">Actualizar Maestro</span><span className="block text-[10px] text-slate-500">Añadir datos a tu Excel</span></div>
+                <DropdownMenuContent align="start" className="w-56 bg-white text-slate-900 border border-slate-200 shadow-lg z-50 p-1">
+                    {previousDays.map((date, idx) => (
+                    <DropdownMenuItem key={idx} onClick={() => setSelectedDate(date)} className="cursor-pointer gap-2 hover:bg-slate-100 text-slate-700">
+                        {date.getDate() === selectedDate.getDate() && <CheckCircle2 className="w-4 h-4 text-[#0B2149]" />}
+                        <span className={date.getDate() === selectedDate.getDate() ? "font-bold text-[#0B2149]" : ""}>{formatDateLabel(date)}</span>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleExportHistory} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
-                        <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700"><Save className="w-4 h-4" /></div>
-                        <div><span className="block font-bold text-[#0B2149] text-xs">Descargar Todo</span><span className="block text-[10px] text-slate-500">Generar archivo nuevo</span></div>
-                    </DropdownMenuItem>
+                    ))}
                 </DropdownMenuContent>
-             </DropdownMenu>
-          </div>
-        </div>
+                </DropdownMenu>
+            </div>
+            
+            <div className="flex items-center gap-2">
+                {/* MENU EXCEL */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button 
+                        className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border border-emerald-500/30 active:scale-95 outline-none"
+                        disabled={isExporting}
+                        >
+                        {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
+                        Excel
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 bg-white border-slate-200 shadow-xl">
+                        <DropdownMenuLabel>Gestión de Datos</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleUpdateMasterExcel} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
+                            <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><RefreshCw className="w-4 h-4" /></div>
+                            <div><span className="block font-bold text-[#0B2149] text-xs">Actualizar Maestro</span><span className="block text-[10px] text-slate-500">Añadir datos a tu Excel</span></div>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleExportHistory} className="cursor-pointer gap-3 p-3 focus:bg-slate-50">
+                            <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700"><Save className="w-4 h-4" /></div>
+                            <div><span className="block font-bold text-[#0B2149] text-xs">Descargar Todo</span><span className="block text-[10px] text-slate-500">Generar archivo nuevo</span></div>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+            </div>
 
-        <div className="flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-bold mb-1">Panel Técnico</h1>
-            <p className="text-blue-200 text-sm flex items-center gap-1">
-              <Activity className="w-3 h-3" /> {loading ? "Cargando..." : `Resumen del ${formatDateLabel(selectedDate)}`}
-            </p>
-          </div>
+            <div className="flex justify-between items-end">
+            <div>
+                <h1 className="text-3xl font-bold mb-1">Panel Técnico</h1>
+                <p className="text-blue-200 text-sm flex items-center gap-1">
+                <Activity className="w-3 h-3" /> {loading ? "Cargando..." : `Resumen del ${formatDateLabel(selectedDate)}`}
+                </p>
+            </div>
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <button className="text-right group active:scale-95 transition-transform bg-white/5 p-2 pr-3 rounded-lg border border-white/10 hover:bg-white/10">
-                <div className="text-2xl font-mono font-bold text-white group-hover:text-blue-100 leading-none mb-1">
-                  {completedCount}<span className="text-sm text-blue-300 font-normal">/{totalPlayers}</span>
-                </div>
-                <div className="text-[10px] text-blue-200 uppercase tracking-widest flex items-center justify-end gap-1">
-                  Reportes <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
-                </div>
-              </button>
-            </SheetTrigger>
-            <SheetContent className="w-[90%] sm:w-[400px] bg-white text-slate-900 border-l border-slate-200 z-50">
-              <SheetHeader className="mb-6">
-                <SheetTitle className="text-[#0B2149] text-xl">Reportes: {activeTab === "morning" ? "Wellness" : "RPE"}</SheetTitle>
-                <div className="text-sm text-slate-500">Detalle de entregas del {formatDateLabel(selectedDate)}</div>
-              </SheetHeader>
-              <ReportsSheet players={players} activeTab={activeTab} />
-            </SheetContent>
-          </Sheet>
+            <Sheet>
+                <SheetTrigger asChild>
+                <button className="text-right group active:scale-95 transition-transform bg-white/5 p-2 pr-3 rounded-lg border border-white/10 hover:bg-white/10">
+                    <div className="text-2xl font-mono font-bold text-white group-hover:text-blue-100 leading-none mb-1">
+                    {completedCount}<span className="text-sm text-blue-300 font-normal">/{totalPlayers}</span>
+                    </div>
+                    <div className="text-[10px] text-blue-200 uppercase tracking-widest flex items-center justify-end gap-1">
+                    Reportes <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                    </div>
+                </button>
+                </SheetTrigger>
+                <SheetContent className="w-[90%] sm:w-[400px] bg-white text-slate-900 border-l border-slate-200 z-50">
+                <SheetHeader className="mb-6">
+                    <SheetTitle className="text-[#0B2149] text-xl">Reportes: {activeTab === "morning" ? "Wellness" : "RPE"}</SheetTitle>
+                    <div className="text-sm text-slate-500">Detalle de entregas del {formatDateLabel(selectedDate)}</div>
+                </SheetHeader>
+                <ReportsSheet players={players} activeTab={activeTab} />
+                </SheetContent>
+            </Sheet>
+            </div>
         </div>
       </div>
 
       {/* --- CONTENIDO --- */}
-      <div className="px-4 -mt-6">
+      <div className="px-4 -mt-10 max-w-7xl mx-auto">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full bg-white p-1 rounded-xl shadow-lg border border-slate-100 h-14 grid grid-cols-3">
+          <TabsList className="w-full bg-white p-1 rounded-xl shadow-lg border border-slate-100 h-14 grid grid-cols-3 max-w-2xl mx-auto md:mx-0">
             <TabsTrigger value="morning" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">Wellness</TabsTrigger>
             <TabsTrigger value="session" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">RPE</TabsTrigger>
             <TabsTrigger value="calendar" className="rounded-lg h-full data-[state=active]:bg-[#0B2149] data-[state=active]:text-white transition-all text-slate-600 text-xs sm:text-sm">Calendario</TabsTrigger>
           </TabsList>
 
-          {activeTab === "morning" && (
-            <WellnessTab 
-              players={players} 
-              loading={loading} 
-              onPlayerClick={setSelectedPlayer} 
-            />
-          )}
-          
-          {activeTab === "session" && (
-            <RPETab players={players} plannedRpe={plannedRpe} onSaveTarget={saveTarget} />
-          )}
+          <div className="mt-6">
+            {activeTab === "morning" && (
+                <WellnessTab 
+                players={players} 
+                loading={loading} 
+                onPlayerClick={setSelectedPlayer} 
+                />
+            )}
+            
+            {activeTab === "session" && (
+                <RPETab players={players} plannedRpe={plannedRpe} onSaveTarget={saveTarget} />
+            )}
 
-          {activeTab === "calendar" && (
-            <div className="mt-4">
-                <WeeklyCalendar isStaff={true} />
-            </div>
-          )}
+            {activeTab === "calendar" && (
+                <div className="mt-4">
+                    <WeeklyCalendar isStaff={true} />
+                </div>
+            )}
+          </div>
         </Tabs>
       </div>
     </div>
