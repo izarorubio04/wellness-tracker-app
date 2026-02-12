@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
 import { DEFAULT_SCHEDULE, UserPreferences, NotificationSchedule } from '../types/user';
-import { Switch } from './ui/switch'; // Asegúrate de que este import funciona
+import { Checkbox } from './ui/checkbox'; // <--- CAMBIO: Importamos Checkbox en lugar de Switch
 
 interface NotificationSettingsProps {
   playerName: string;
@@ -46,7 +46,7 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
       const docRef = doc(db, 'users', playerName);
       const snap = await getDoc(docRef);
       if (snap.exists() && snap.data().preferences) {
-        // Fusionamos con los valores por defecto para evitar errores si faltan campos
+        // Fusionamos con los valores por defecto para evitar errores
         setPreferences({
             ...{
                 wellness: { ...DEFAULT_SCHEDULE },
@@ -74,7 +74,6 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
     }));
   };
 
-  // Manejador para el toggle de calendario
   const handleCalendarToggle = (checked: boolean) => {
     setPreferences(prev => ({
         ...prev,
@@ -141,7 +140,10 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
         ) : (
           <>
             {/* SECCIÓN CALENDARIO (GLOBAL) */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+            <div 
+                className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 cursor-pointer"
+                onClick={() => handleCalendarToggle(!preferences.calendarEnabled)} // Hace clicable toda la tarjeta
+            >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
@@ -152,9 +154,12 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
                             <p className="text-xs text-slate-500">Avísame si hay nuevos eventos o cambios</p>
                         </div>
                     </div>
-                    <Switch 
+                    
+                    {/* AQUÍ ESTÁ EL CAMBIO: Checkbox cuadrado */}
+                    <Checkbox 
                         checked={preferences.calendarEnabled}
                         onCheckedChange={handleCalendarToggle}
+                        className="w-6 h-6 border-2 border-slate-300 data-[state=checked]:bg-[#89eb98] data-[state=checked]:border-[#d3dbeb]"
                     />
                 </div>
             </div>
