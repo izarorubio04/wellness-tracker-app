@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Bell, Clock, Save, Info } from 'lucide-react';
+import { ArrowLeft, Bell, Clock, Save, Info, Calendar as CalendarIcon } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
 import { DEFAULT_SCHEDULE, UserPreferences, NotificationSchedule } from '../types/user';
+import { Switch } from './ui/switch'; // Asegúrate de que este import funciona
 
 interface NotificationSettingsProps {
   playerName: string;
@@ -20,7 +21,6 @@ const DAYS = [
   { key: 'sunday', label: 'Domingo' },
 ];
 
-// Generamos horas de 07:00 a 23:00
 const HOURS = Array.from({ length: 17 }, (_, i) => {
   const h = i + 7;
   return `${h.toString().padStart(2, '0')}:00`;
@@ -29,9 +29,12 @@ const HOURS = Array.from({ length: 17 }, (_, i) => {
 export function NotificationSettings({ playerName, onBack }: NotificationSettingsProps) {
   const [activeTab, setActiveTab] = useState<'wellness' | 'rpe'>('wellness');
   const [loading, setLoading] = useState(true);
+  
+  // Estado completo de preferencias
   const [preferences, setPreferences] = useState<UserPreferences>({
     wellness: { ...DEFAULT_SCHEDULE },
-    rpe: { ...DEFAULT_SCHEDULE }
+    rpe: { ...DEFAULT_SCHEDULE },
+    calendarEnabled: false
   });
 
   useEffect(() => {
@@ -43,7 +46,15 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
       const docRef = doc(db, 'users', playerName);
       const snap = await getDoc(docRef);
       if (snap.exists() && snap.data().preferences) {
-        setPreferences(snap.data().preferences);
+        // Fusionamos con los valores por defecto para evitar errores si faltan campos
+        setPreferences({
+            ...{
+                wellness: { ...DEFAULT_SCHEDULE },
+                rpe: { ...DEFAULT_SCHEDULE },
+                calendarEnabled: false
+            },
+            ...snap.data().preferences
+        });
       }
     } catch (error) {
       console.error("Error cargando preferencias:", error);
@@ -63,12 +74,20 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
     }));
   };
 
+  // Manejador para el toggle de calendario
+  const handleCalendarToggle = (checked: boolean) => {
+    setPreferences(prev => ({
+        ...prev,
+        calendarEnabled: checked
+    }));
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
       const docRef = doc(db, 'users', playerName);
       await setDoc(docRef, { preferences }, { merge: true });
-      toast.success("Horarios actualizados correctamente");
+      toast.success("Preferencias actualizadas");
     } catch (error) {
       console.error("Error guardando:", error);
       toast.error("Error al guardar");
@@ -89,7 +108,7 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
           </button>
           <div>
             <h1 className="text-2xl font-bold text-[#0B2149]">Notificaciones</h1>
-            <p className="text-slate-500 text-sm">Configura tus recordatorios</p>
+            <p className="text-slate-500 text-sm">Configura tus alertas</p>
           </div>
         </div>
 
@@ -101,7 +120,7 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
               activeTab === 'wellness' ? 'bg-white text-[#0B2149] shadow-sm' : 'text-slate-500'
             }`}
           >
-            Wellness (Mañana)
+            Wellness
           </button>
           <button
             onClick={() => setActiveTab('rpe')}
@@ -109,53 +128,75 @@ export function NotificationSettings({ playerName, onBack }: NotificationSetting
               activeTab === 'rpe' ? 'bg-white text-[#0B2149] shadow-sm' : 'text-slate-500'
             }`}
           >
-            RPE (Post-Entreno)
+            RPE
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-6">
         
-        <div className="bg-blue-50 p-4 rounded-xl flex gap-3 text-blue-800 text-sm mb-6">
-          <Info className="w-5 h-5 flex-shrink-0" />
-          <p>
-            Elige a qué hora quieres que te avisemos cada día. Selecciona "No enviar" para descansar ese día.
-          </p>
-        </div>
-
         {loading ? (
           <div className="text-center py-10 text-slate-400">Cargando configuración...</div>
         ) : (
-          <div className="space-y-3">
-            {DAYS.map((day) => (
-              <div key={day.key} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
-                <span className="font-medium text-slate-700 w-24">{day.label}</span>
-                
-                <div className="relative flex-1 max-w-[140px]">
-                  <select
-                    value={currentSchedule[day.key as keyof NotificationSchedule] || "disabled"}
-                    onChange={(e) => handleTimeChange(activeTab, day.key, e.target.value)}
-                    className={`w-full p-2 pl-9 rounded-lg appearance-none outline-none font-medium text-sm border transition-colors ${
-                      currentSchedule[day.key as keyof NotificationSchedule] === "disabled"
-                        ? "bg-slate-50 text-slate-400 border-slate-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200"
-                    }`}
-                  >
-                    <option value="disabled">No enviar</option>
-                    {HOURS.map(h => (
-                      <option key={h} value={h}>{h}</option>
-                    ))}
-                  </select>
-                  {currentSchedule[day.key as keyof NotificationSchedule] === "disabled" ? (
-                    <Bell className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  ) : (
-                    <Clock className="w-4 h-4 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
-                  )}
+          <>
+            {/* SECCIÓN CALENDARIO (GLOBAL) */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                            <CalendarIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-[#0B2149]">Cambios en Agenda</h3>
+                            <p className="text-xs text-slate-500">Avísame si hay nuevos eventos o cambios</p>
+                        </div>
+                    </div>
+                    <Switch 
+                        checked={preferences.calendarEnabled}
+                        onCheckedChange={handleCalendarToggle}
+                    />
                 </div>
-              </div>
-            ))}
-          </div>
+            </div>
+
+            {/* SECCIÓN HORARIOS (WELLNESS/RPE) */}
+            <div>
+                <h3 className="font-bold text-[#0B2149] mb-3 ml-1 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Horarios {activeTab === 'wellness' ? 'Wellness' : 'RPE'}
+                </h3>
+                
+                <div className="space-y-3">
+                    {DAYS.map((day) => (
+                    <div key={day.key} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <span className="font-medium text-slate-700 w-24">{day.label}</span>
+                        
+                        <div className="relative flex-1 max-w-[140px]">
+                        <select
+                            value={currentSchedule[day.key as keyof NotificationSchedule] || "disabled"}
+                            onChange={(e) => handleTimeChange(activeTab, day.key, e.target.value)}
+                            className={`w-full p-2 pl-9 rounded-lg appearance-none outline-none font-medium text-sm border transition-colors ${
+                            currentSchedule[day.key as keyof NotificationSchedule] === "disabled"
+                                ? "bg-slate-50 text-slate-400 border-slate-200"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                        >
+                            <option value="disabled">No enviar</option>
+                            {HOURS.map(h => (
+                            <option key={h} value={h}>{h}</option>
+                            ))}
+                        </select>
+                        {currentSchedule[day.key as keyof NotificationSchedule] === "disabled" ? (
+                            <Bell className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        ) : (
+                            <Clock className="w-4 h-4 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                        )}
+                        </div>
+                    </div>
+                    ))}
+                </div>
+            </div>
+          </>
         )}
       </div>
 

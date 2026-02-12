@@ -11,6 +11,7 @@ export interface NotificationSchedule {
 export interface UserPreferences {
   wellness: NotificationSchedule;
   rpe: NotificationSchedule;
+  calendarEnabled: boolean; // <--- NUEVO CAMPO
 }
 
 // Valores por defecto (Todo desactivado)
@@ -22,4 +23,10 @@ export const DEFAULT_SCHEDULE: NotificationSchedule = {
   friday: "disabled",
   saturday: "disabled",
   sunday: "disabled"
+};
+
+export const DEFAULT_PREFERENCES: UserPreferences = {
+    wellness: { ...DEFAULT_SCHEDULE },
+    rpe: { ...DEFAULT_SCHEDULE },
+    calendarEnabled: false // Por defecto desactivado
 };

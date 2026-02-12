@@ -13,23 +13,109 @@ const DAY_MAP = {
   6: 'saturday'
 };
 
-// --------------------------------------------------------------------------------
-// 1. RECORDATORIO A JUGADORAS (Cada hora según preferencias)
-// --------------------------------------------------------------------------------
+// TRADUCCIÓN DE TIPOS (Para que el mensaje quede bonito)
+const TYPE_LABELS = {
+  citation: "Citación",
+  gym: "Gimnasio",
+  session: "Sesión",
+  video: "Vídeo",
+  match: "Partido",
+  other: "Actividad"
+};
+
+// ============================================================================
+// 1. NOTIFICADOR DE CAMBIOS EN CALENDARIO (Tiempo Real)
+// ============================================================================
+exports.notifyCalendarChanges = functions.firestore
+  .document('calendar_events/{eventId}')
+  .onWrite(async (change, context) => {
+    // 1. Obtener datos antes y después
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+
+    let title = "";
+    let body = "";
+
+    // 2. Determinar qué ha pasado (Crear, Editar, Borrar)
+    if (!before && after) {
+        // CREACIÓN
+        const typeName = TYPE_LABELS[after.type] || "Actividad";
+        title = `📅 Nueva Agenda: ${typeName}`;
+        body = `${after.title} el ${after.date} a las ${after.startTime}.`;
+    } 
+    else if (before && after) {
+        // EDICIÓN (Evitamos notificar si no cambiaron datos clave)
+        if (
+            before.title === after.title && 
+            before.date === after.date && 
+            before.startTime === after.startTime &&
+            before.location === after.location
+        ) {
+            return null; // Cambios menores (ej: notas) no notifican para no spamear
+        }
+        title = `🔄 Cambio en Agenda: ${after.title}`;
+        body = `Se han actualizado los detalles de la actividad del ${after.date}.`;
+    } 
+    else if (before && !after) {
+        // BORRADO
+        title = `🗑️ Actividad Cancelada`;
+        body = `Se ha eliminado: ${before.title} (${before.date}).`;
+    } else {
+        return null;
+    }
+
+    // 3. Buscar destinatarios (Jugadoras con calendarEnabled = true)
+    const db = admin.firestore();
+    const usersSnapshot = await db.collection("users").where("role", "==", "player").get();
+    
+    const tokensToSend = [];
+    usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        const prefs = userData.preferences;
+        
+        // Verificamos si tiene la opción activada
+        if (prefs && prefs.calendarEnabled === true && userData.fcmTokens && userData.fcmTokens.length > 0) {
+            tokensToSend.push(...userData.fcmTokens);
+        }
+    });
+
+    if (tokensToSend.length === 0) {
+        functions.logger.info("Cambio en calendario detectado, pero nadie tiene activadas las notificaciones.");
+        return null;
+    }
+
+    // 4. Enviar notificación
+    try {
+        const response = await admin.messaging().sendEachForMulticast({
+            notification: {
+                title: title,
+                body: body,
+            },
+            tokens: tokensToSend
+        });
+        functions.logger.info(`Notificación de calendario enviada a ${response.successCount} dispositivos.`);
+    } catch (error) {
+        functions.logger.error("Error enviando alerta de calendario:", error);
+    }
+  });
+
+
+// ============================================================================
+// 2. RECORDATORIO A JUGADORAS (Cada hora según preferencias)
+// ============================================================================
 exports.hourlyNotificationDispatcher = functions.pubsub
   .schedule("0 * * * *")
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
     
-    // Calcular hora actual en Madrid
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Europe/Madrid',
       hour: '2-digit',
       hour12: false,
     });
-    const hourPart = formatter.format(now); // "09", "14"...
+    const hourPart = formatter.format(now); 
     
     const madridDateStr = now.toLocaleString("en-US", {timeZone: "Europe/Madrid"});
     const madridDate = new Date(madridDateStr);
@@ -44,7 +130,6 @@ exports.hourlyNotificationDispatcher = functions.pubsub
       const wellnessTokens = [];
       const rpeTokens = [];
 
-      // Comprobar quién ha cumplido hoy
       const todayStart = new Date();
       todayStart.setHours(0,0,0,0);
       
@@ -58,25 +143,21 @@ exports.hourlyNotificationDispatcher = functions.pubsub
       const completedRPE = new Set();
       rpeTodaySnap.forEach(doc => completedRPE.add(doc.data().playerName));
 
-      // Filtrar usuarios
       usersSnapshot.forEach(doc => {
         const data = doc.data();
         const prefs = data.preferences;
         
         if (!prefs || !data.fcmTokens || data.fcmTokens.length === 0) return;
 
-        // Wellness
         if (prefs.wellness?.[dayKey] === currentHourStr && !completedWellness.has(data.name)) {
            wellnessTokens.push(...data.fcmTokens);
         }
 
-        // RPE
         if (prefs.rpe?.[dayKey] === currentHourStr && !completedRPE.has(data.name)) {
            rpeTokens.push(...data.fcmTokens);
         }
       });
 
-      // Envíos
       if (wellnessTokens.length > 0) {
         await admin.messaging().sendEachForMulticast({
           notification: {
@@ -106,11 +187,11 @@ exports.hourlyNotificationDispatcher = functions.pubsub
   });
 
 
-// --------------------------------------------------------------------------------
-// 2. AVISO AL STAFF: LISTA DE FALTAS (A las 12:00)
-// --------------------------------------------------------------------------------
+// ============================================================================
+// 3. AVISO AL STAFF: LISTA DE FALTAS (A las 12:00)
+// ============================================================================
 exports.missingReportsNotifier = functions.pubsub
-  .schedule("0 12 * * *") // A las 12:00 PM todos los días
+  .schedule("0 12 * * *") 
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
@@ -118,29 +199,22 @@ exports.missingReportsNotifier = functions.pubsub
     today.setHours(0, 0, 0, 0);
 
     try {
-      // 1. Obtener todas las jugadoras
       const playersSnap = await db.collection("users").where("role", "==", "player").get();
       const allPlayerNames = [];
       playersSnap.forEach(doc => allPlayerNames.push(doc.data().name));
 
       if (allPlayerNames.length === 0) return null;
 
-      // 2. Obtener quién ha cumplido hoy
       const wellnessSnap = await db.collection("wellness_logs")
         .where("timestamp", ">=", today.getTime()).get();
       
       const submittedSet = new Set();
       wellnessSnap.forEach(doc => submittedSet.add(doc.data().playerName));
 
-      // 3. Calcular quién falta
       const missingPlayers = allPlayerNames.filter(name => !submittedSet.has(name));
 
-      if (missingPlayers.length === 0) {
-        functions.logger.info("A las 12:00 todos han cumplido. No se molesta al staff.");
-        return null;
-      }
+      if (missingPlayers.length === 0) return null;
 
-      // 4. Buscar Staff para avisar
       const staffSnap = await db.collection("users").where("role", "==", "staff").get();
       const staffTokens = [];
       staffSnap.forEach(doc => {
@@ -150,15 +224,12 @@ exports.missingReportsNotifier = functions.pubsub
 
       if (staffTokens.length === 0) return null;
 
-      // 5. Crear mensaje inteligente
       const count = missingPlayers.length;
       let bodyText = "";
       
       if (count <= 3) {
-        // Si son pocas, decimos nombres: "Faltan: Ana, María, Lucía"
         bodyText = `Faltan: ${missingPlayers.join(", ")}`;
       } else {
-        // Si son muchas, resumen: "Faltan 8 jugadoras (Ana, María...)"
         const firstNames = missingPlayers.slice(0, 2).join(", ");
         bodyText = `Faltan ${count} jugadoras por rellenar (${firstNames}...).`;
       }
@@ -171,8 +242,6 @@ exports.missingReportsNotifier = functions.pubsub
         tokens: staffTokens
       });
 
-      functions.logger.info(`Aviso de faltas enviado al staff. Faltan: ${count}`);
-
     } catch (error) {
       functions.logger.error("Error en aviso de faltas:", error);
     }
@@ -180,16 +249,14 @@ exports.missingReportsNotifier = functions.pubsub
   });
 
 
-// --------------------------------------------------------------------------------
-// 3. ALERTA INSTANTÁNEA AL STAFF (Riesgo O Notas)
-// --------------------------------------------------------------------------------
+// ============================================================================
+// 4. ALERTA INSTANTÁNEA AL STAFF (Riesgo O Notas)
+// ============================================================================
 exports.checkWellnessRisk = functions.firestore
   .document("wellness_logs/{docId}")
   .onCreate(async (snap, context) => {
     const data = snap.data();
-    functions.logger.info("Analizando wellness de:", data.playerName);
-
-    // A. Detectar Riesgo Numérico
+    
     const isRisk = 
       Number(data.fatigueLevel) >= 8 || 
       Number(data.sleepQuality) >= 8 || 
@@ -197,15 +264,10 @@ exports.checkWellnessRisk = functions.firestore
       Number(data.stressLevel) >= 8 || 
       Number(data.mood) >= 8;
 
-    // B. Detectar Nota Escrita (Si existe y no está vacía)
     const hasNote = data.notes && data.notes.trim().length > 0;
 
-    // Si no hay nada raro, terminamos
-    if (!isRisk && !hasNote) {
-        return null;
-    }
+    if (!isRisk && !hasNote) return null;
 
-    // Buscar tokens del Staff
     const db = admin.firestore();
     const staffSnapshot = await db.collection("users").where("role", "==", "staff").get();
     const staffTokens = [];
@@ -217,7 +279,6 @@ exports.checkWellnessRisk = functions.firestore
 
     if (staffTokens.length === 0) return null;
 
-    // Decidir el mensaje según lo que haya pasado
     let title = "";
     let body = "";
 
@@ -231,8 +292,6 @@ exports.checkWellnessRisk = functions.firestore
       title = "📝 Nueva Nota de Jugadora";
       body = `${data.playerName} ha escrito: "${data.notes}"`;
     }
-
-    functions.logger.info(`Enviando alerta a Staff. Motivo: ${title}`);
 
     try {
       await admin.messaging().sendEachForMulticast({
