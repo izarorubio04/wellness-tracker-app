@@ -44,11 +44,10 @@ export default function App() {
     }
   }, []);
 
-  // [CORREGIDO] Gestión correcta del listener para evitar duplicados
+  // [CORREGIDO] Sistema anti-duplicados para notificaciones en primer plano
   useEffect(() => {
-    // Iniciamos la escucha y guardamos la función de "desuscripción"
+    // Activamos la escucha y guardamos el "botón de apagado" (unsubscribe)
     const unsubscribe = onMessageListener((payload) => {
-        // Solo mostramos el toast si hay notificación visual
         if (payload.notification) {
             toast(payload.notification.title, {
                 description: payload.notification.body,
@@ -57,8 +56,7 @@ export default function App() {
         }
     });
 
-    // Esta función se ejecuta al desmontar el componente o volver a ejecutar el efecto
-    // Es la clave para que no se acumulen listeners
+    // React ejecutará esto automáticamente al desmontar o actualizar el componente
     return () => {
         if (unsubscribe) unsubscribe();
     };

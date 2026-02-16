@@ -22,7 +22,7 @@ const TYPE_LABELS = {
 };
 
 // ============================================================================
-// 1. NOTIFICADOR DE CAMBIOS EN CALENDARIO
+// 1. NOTIFICADOR DE CAMBIOS EN CALENDARIO (Con Deduplicación)
 // ============================================================================
 exports.notifyCalendarChanges = functions.firestore
   .document('calendar_events/{eventId}')
@@ -33,6 +33,7 @@ exports.notifyCalendarChanges = functions.firestore
     let title = "";
     let body = "";
 
+    // Lógica para detectar el tipo de cambio
     if (!before && after) {
         const typeName = TYPE_LABELS[after.type] || "Actividad";
         title = `📅 Nueva Agenda: ${typeName}`;
@@ -44,9 +45,8 @@ exports.notifyCalendarChanges = functions.firestore
             before.date === after.date && 
             before.startTime === after.startTime &&
             before.location === after.location
-        ) {
-            return null; 
-        }
+        ) return null;
+        
         title = `🔄 Cambio en Agenda: ${after.title}`;
         body = `Se han actualizado los detalles de la actividad del ${after.date}.`;
     } 
@@ -65,6 +65,7 @@ exports.notifyCalendarChanges = functions.firestore
         const userData = doc.data();
         const prefs = userData.preferences;
         
+        // Filtramos solo usuarios que tengan la opción activada y tokens válidos
         if (prefs && prefs.calendarEnabled === true && userData.fcmTokens && userData.fcmTokens.length > 0) {
             tokensToSend.push(...userData.fcmTokens);
         }
@@ -72,7 +73,7 @@ exports.notifyCalendarChanges = functions.firestore
 
     if (tokensToSend.length === 0) return null;
 
-    // [DEDUPLICACIÓN]: Aseguramos que no haya tokens repetidos
+    // [DEDUPLICACIÓN]: Esto borra tokens idénticos antes de enviar
     const uniqueTokens = [...new Set(tokensToSend)];
 
     try {
@@ -80,7 +81,7 @@ exports.notifyCalendarChanges = functions.firestore
             notification: { title, body },
             tokens: uniqueTokens
         });
-        functions.logger.info(`Notificación calendario: ${response.successCount} envíos.`);
+        functions.logger.info(`Notificación calendario enviada. Intentos: ${uniqueTokens.length}, Éxitos: ${response.successCount}`);
     } catch (error) {
         functions.logger.error("Error calendario:", error);
     }
@@ -88,7 +89,7 @@ exports.notifyCalendarChanges = functions.firestore
 
 
 // ============================================================================
-// 2. RECORDATORIO HORARIO
+// 2. RECORDATORIO HORARIO (Con Deduplicación)
 // ============================================================================
 exports.hourlyNotificationDispatcher = functions.pubsub
   .schedule("0 * * * *")
@@ -96,152 +97,107 @@ exports.hourlyNotificationDispatcher = functions.pubsub
   .onRun(async (context) => {
     const db = admin.firestore();
     const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Europe/Madrid',
-      hour: '2-digit',
-      hour12: false,
-    });
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Madrid', hour: '2-digit', hour12: false });
     const hourPart = formatter.format(now); 
     const madridDateStr = now.toLocaleString("en-US", {timeZone: "Europe/Madrid"});
-    const madridDate = new Date(madridDateStr);
-    const dayKey = DAY_MAP[madridDate.getDay()];
+    const dayKey = DAY_MAP[new Date(madridDateStr).getDay()];
     const currentHourStr = `${hourPart}:00`;
 
     functions.logger.info(`⏰ Cron horario: ${dayKey}, ${currentHourStr}`);
 
     try {
       const usersSnapshot = await db.collection("users").where("role", "==", "player").get();
-      
       let wellnessTokens = [];
       let rpeTokens = [];
 
-      const todayStart = new Date();
-      todayStart.setHours(0,0,0,0);
-      
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const logsTodaySnap = await db.collection("wellness_logs").where("timestamp", ">=", todayStart.getTime()).get();
-      const completedWellness = new Set();
-      logsTodaySnap.forEach(doc => completedWellness.add(doc.data().playerName));
-
+      const completedWellness = new Set(); logsTodaySnap.forEach(doc => completedWellness.add(doc.data().playerName));
       const rpeTodaySnap = await db.collection("rpe_logs").where("timestamp", ">=", todayStart.getTime()).get();
-      const completedRPE = new Set();
-      rpeTodaySnap.forEach(doc => completedRPE.add(doc.data().playerName));
+      const completedRPE = new Set(); rpeTodaySnap.forEach(doc => completedRPE.add(doc.data().playerName));
 
       usersSnapshot.forEach(doc => {
         const data = doc.data();
         const prefs = data.preferences;
-        if (!prefs || !data.fcmTokens || data.fcmTokens.length === 0) return;
+        if (!prefs || !data.fcmTokens) return;
 
         if (prefs.wellness?.[dayKey] === currentHourStr && !completedWellness.has(data.name)) {
            wellnessTokens.push(...data.fcmTokens);
         }
-
         if (prefs.rpe?.[dayKey] === currentHourStr && !completedRPE.has(data.name)) {
            rpeTokens.push(...data.fcmTokens);
         }
       });
 
-      // DEDUPLICACIÓN
+      // [DEDUPLICACIÓN]
       const uniqueWellness = [...new Set(wellnessTokens)];
       const uniqueRPE = [...new Set(rpeTokens)];
 
       if (uniqueWellness.length > 0) {
         await admin.messaging().sendEachForMulticast({
-          notification: {
-            title: "¡Buenos días!",
-            body: "Es hora de tu Wellness diario ☀️",
-          },
+          notification: { title: "¡Buenos días!", body: "Es hora de tu Wellness diario ☀️" },
           tokens: uniqueWellness
         });
       }
-
       if (uniqueRPE.length > 0) {
         await admin.messaging().sendEachForMulticast({
-          notification: {
-            title: "Entrenamiento finalizado",
-            body: "¿Qué tal ha ido? Registra tu RPE ⚽️",
-          },
+          notification: { title: "Entrenamiento finalizado", body: "¿Qué tal ha ido? Registra tu RPE ⚽️" },
           tokens: uniqueRPE
         });
       }
-
-    } catch (error) {
-      functions.logger.error("Error cron horario:", error);
-    }
+    } catch (error) { functions.logger.error(error); }
     return null;
   });
 
 
 // ============================================================================
-// 3. AVISO FALTAS 12:00
+// 3. AVISO FALTAS (Con Deduplicación)
 // ============================================================================
 exports.missingReportsNotifier = functions.pubsub
   .schedule("0 12 * * *") 
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const playersSnap = await db.collection("users").where("role", "==", "player").get();
+    const wellnessSnap = await db.collection("wellness_logs").where("timestamp", ">=", today.getTime()).get();
+    
+    const submittedSet = new Set(); wellnessSnap.forEach(doc => submittedSet.add(doc.data().playerName));
+    const allPlayerNames = []; playersSnap.forEach(doc => allPlayerNames.push(doc.data().name));
+    const missingPlayers = allPlayerNames.filter(name => !submittedSet.has(name));
 
-    try {
-      const playersSnap = await db.collection("users").where("role", "==", "player").get();
-      const allPlayerNames = [];
-      playersSnap.forEach(doc => allPlayerNames.push(doc.data().name));
+    if (missingPlayers.length === 0) return null;
 
-      if (allPlayerNames.length === 0) return null;
-
-      const wellnessSnap = await db.collection("wellness_logs").where("timestamp", ">=", today.getTime()).get();
-      const submittedSet = new Set();
-      wellnessSnap.forEach(doc => submittedSet.add(doc.data().playerName));
-
-      const missingPlayers = allPlayerNames.filter(name => !submittedSet.has(name));
-
-      if (missingPlayers.length === 0) return null;
-
-      const staffSnap = await db.collection("users").where("role", "==", "staff").get();
-      let staffTokens = [];
-      staffSnap.forEach(doc => {
+    const staffSnap = await db.collection("users").where("role", "==", "staff").get();
+    let staffTokens = [];
+    staffSnap.forEach(doc => {
         const d = doc.data();
-        if (d.fcmTokens && d.fcmTokens.length > 0) staffTokens.push(...d.fcmTokens);
-      });
+        if (d.fcmTokens) staffTokens.push(...d.fcmTokens);
+    });
 
-      if (staffTokens.length === 0) return null;
+    if (staffTokens.length === 0) return null;
 
-      const count = missingPlayers.length;
-      let bodyText = count <= 3 ? `Faltan: ${missingPlayers.join(", ")}` : `Faltan ${count} jugadoras por rellenar.`;
+    // [DEDUPLICACIÓN]
+    const uniqueStaff = [...new Set(staffTokens)];
+    const count = missingPlayers.length;
+    const bodyText = count <= 3 ? `Faltan: ${missingPlayers.join(", ")}` : `Faltan ${count} jugadoras.`;
 
-      // DEDUPLICACIÓN
-      const uniqueStaff = [...new Set(staffTokens)];
-
-      await admin.messaging().sendEachForMulticast({
-        notification: {
-          title: "⚠️ Reporte de las 12:00",
-          body: bodyText,
-        },
+    await admin.messaging().sendEachForMulticast({
+        notification: { title: "⚠️ Reporte de las 12:00", body: bodyText },
         tokens: uniqueStaff
-      });
-
-    } catch (error) {
-      functions.logger.error("Error aviso faltas:", error);
-    }
+    });
     return null;
   });
 
 
 // ============================================================================
-// 4. ALERTA INSTANTÁNEA (RIESGO)
+// 4. ALERTA RIESGO (Con Deduplicación)
 // ============================================================================
 exports.checkWellnessRisk = functions.firestore
   .document("wellness_logs/{docId}")
   .onCreate(async (snap, context) => {
     const data = snap.data();
-    
-    const isRisk = 
-      Number(data.fatigueLevel) >= 8 || 
-      Number(data.sleepQuality) >= 8 || 
-      Number(data.muscleSoreness) >= 8 || 
-      Number(data.stressLevel) >= 8 || 
-      Number(data.mood) >= 8;
-
+    const isRisk = Number(data.fatigueLevel) >= 8 || Number(data.sleepQuality) >= 8 || Number(data.muscleSoreness) >= 8 || Number(data.stressLevel) >= 8 || Number(data.mood) >= 8;
     const hasNote = data.notes && data.notes.trim().length > 0;
 
     if (!isRisk && !hasNote) return null;
@@ -249,37 +205,21 @@ exports.checkWellnessRisk = functions.firestore
     const db = admin.firestore();
     const staffSnapshot = await db.collection("users").where("role", "==", "staff").get();
     let staffTokens = [];
-    
     staffSnapshot.forEach(doc => {
-      const d = doc.data();
-      if (d.fcmTokens && d.fcmTokens.length > 0) staffTokens.push(...d.fcmTokens);
+        const d = doc.data();
+        if (d.fcmTokens) staffTokens.push(...d.fcmTokens);
     });
 
     if (staffTokens.length === 0) return null;
 
-    let title = "";
-    let body = "";
-
-    if (isRisk && hasNote) {
-      title = "⚠️ Riesgo + Nota";
-      body = `${data.playerName}: Valores altos + comentario.`;
-    } else if (isRisk) {
-      title = "⚠️ Alerta de Wellness";
-      body = `${data.playerName} reporta valores altos.`;
-    } else if (hasNote) {
-      title = "📝 Nueva Nota";
-      body = `${data.playerName} ha escrito una nota.`;
-    }
-
-    // DEDUPLICACIÓN
+    // [DEDUPLICACIÓN]
     const uniqueStaff = [...new Set(staffTokens)];
+    
+    let title = isRisk ? "⚠️ Alerta de Wellness" : "📝 Nueva Nota";
+    let body = `${data.playerName} ha enviado un reporte importante.`;
 
-    try {
-      await admin.messaging().sendEachForMulticast({
+    await admin.messaging().sendEachForMulticast({
         notification: { title, body },
         tokens: uniqueStaff,
-      });
-    } catch (error) {
-      functions.logger.error("Error alerta staff:", error);
-    }
+    });
   });
