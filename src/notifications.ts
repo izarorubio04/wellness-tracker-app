@@ -51,6 +51,7 @@ export const requestNotificationPermission = async (userId: string, role: string
       const token = await getToken(messaging, { vapidKey: VAPID_KEY });
       
       if (token) {
+        console.log("Token FCM obtenido");
         await saveTokenToDatabase(userId, token, role);
       }
     }
@@ -60,7 +61,7 @@ export const requestNotificationPermission = async (userId: string, role: string
 };
 
 /**
- * Guarda el token en Firestore sin machacar los existentes
+ * Guarda el token en Firestore
  */
 const saveTokenToDatabase = async (userId: string, token: string, role: string) => {
   const userRef = doc(db, "users", userId);
@@ -80,14 +81,15 @@ const saveTokenToDatabase = async (userId: string, token: string, role: string) 
         role: role 
       }, { merge: true });
     }
+    console.log(`Token guardado para ${userId}`);
   } catch (error) {
     console.error("Error guardando token en BD:", error);
   }
 };
 
 /**
- * [CORREGIDO] Escucha mensajes en primer plano.
- * Devuelve una función 'Unsubscribe' para detener la escucha y evitar duplicados.
+ * [CRÍTICO] Esta función ahora devuelve 'Unsubscribe'.
+ * Esto permite a App.tsx detener la escucha para evitar duplicados.
  */
 export const onMessageListener = (callback: (payload: MessagePayload) => void): Unsubscribe => {
   return onMessage(messaging, (payload) => {

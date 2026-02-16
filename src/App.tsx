@@ -44,9 +44,9 @@ export default function App() {
     }
   }, []);
 
-  // [CORREGIDO] Sistema anti-duplicados para notificaciones en primer plano
+  // [CORREGIDO] Sistema de escucha único
+  // Al usar la función de limpieza (return), evitamos que se acumulen listeners
   useEffect(() => {
-    // Activamos la escucha y guardamos el "botón de apagado" (unsubscribe)
     const unsubscribe = onMessageListener((payload) => {
         if (payload.notification) {
             toast(payload.notification.title, {
@@ -56,7 +56,7 @@ export default function App() {
         }
     });
 
-    // React ejecutará esto automáticamente al desmontar o actualizar el componente
+    // Esta línea elimina el listener anterior antes de crear uno nuevo
     return () => {
         if (unsubscribe) unsubscribe();
     };

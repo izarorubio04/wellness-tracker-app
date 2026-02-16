@@ -22,7 +22,7 @@ const TYPE_LABELS = {
 };
 
 // ============================================================================
-// 1. NOTIFICADOR DE CAMBIOS EN CALENDARIO (Con Deduplicación)
+// 1. NOTIFICADOR DE CAMBIOS EN CALENDARIO (Con Log de Diagnóstico)
 // ============================================================================
 exports.notifyCalendarChanges = functions.firestore
   .document('calendar_events/{eventId}')
@@ -33,7 +33,6 @@ exports.notifyCalendarChanges = functions.firestore
     let title = "";
     let body = "";
 
-    // Lógica para detectar el tipo de cambio
     if (!before && after) {
         const typeName = TYPE_LABELS[after.type] || "Actividad";
         title = `📅 Nueva Agenda: ${typeName}`;
@@ -58,38 +57,44 @@ exports.notifyCalendarChanges = functions.firestore
     }
 
     const db = admin.firestore();
+    // Filtramos solo jugadores
     const usersSnapshot = await db.collection("users").where("role", "==", "player").get();
     
     let tokensToSend = [];
+    let targetedUsers = []; // Para el log de diagnóstico
+
     usersSnapshot.forEach(doc => {
         const userData = doc.data();
         const prefs = userData.preferences;
         
-        // Filtramos solo usuarios que tengan la opción activada y tokens válidos
         if (prefs && prefs.calendarEnabled === true && userData.fcmTokens && userData.fcmTokens.length > 0) {
             tokensToSend.push(...userData.fcmTokens);
+            targetedUsers.push(userData.name || doc.id); // Guardamos el nombre para ver quién recibe
         }
     });
 
     if (tokensToSend.length === 0) return null;
 
-    // [DEDUPLICACIÓN]: Esto borra tokens idénticos antes de enviar
+    // Deduplicación estricta de tokens
     const uniqueTokens = [...new Set(tokensToSend)];
+
+    // LOG CHIVATO: Te dirá quiénes son los destinatarios
+    functions.logger.info(`Enviando a ${targetedUsers.length} usuarios: [${targetedUsers.join(", ")}]`);
+    functions.logger.info(`Total Tokens Únicos: ${uniqueTokens.length}`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast({
             notification: { title, body },
             tokens: uniqueTokens
         });
-        functions.logger.info(`Notificación calendario enviada. Intentos: ${uniqueTokens.length}, Éxitos: ${response.successCount}`);
+        functions.logger.info(`Resultado envío: ${response.successCount} éxitos.`);
     } catch (error) {
         functions.logger.error("Error calendario:", error);
     }
   });
 
-
 // ============================================================================
-// 2. RECORDATORIO HORARIO (Con Deduplicación)
+// 2. RECORDATORIO HORARIO
 // ============================================================================
 exports.hourlyNotificationDispatcher = functions.pubsub
   .schedule("0 * * * *")
@@ -129,7 +134,6 @@ exports.hourlyNotificationDispatcher = functions.pubsub
         }
       });
 
-      // [DEDUPLICACIÓN]
       const uniqueWellness = [...new Set(wellnessTokens)];
       const uniqueRPE = [...new Set(rpeTokens)];
 
@@ -149,12 +153,11 @@ exports.hourlyNotificationDispatcher = functions.pubsub
     return null;
   });
 
-
 // ============================================================================
-// 3. AVISO FALTAS (Con Deduplicación)
+// 3. AVISO FALTAS 12:00
 // ============================================================================
 exports.missingReportsNotifier = functions.pubsub
-  .schedule("0 12 * * *") 
+  .schedule("0 12 * * *")
   .timeZone("Europe/Madrid")
   .onRun(async (context) => {
     const db = admin.firestore();
@@ -177,7 +180,6 @@ exports.missingReportsNotifier = functions.pubsub
 
     if (staffTokens.length === 0) return null;
 
-    // [DEDUPLICACIÓN]
     const uniqueStaff = [...new Set(staffTokens)];
     const count = missingPlayers.length;
     const bodyText = count <= 3 ? `Faltan: ${missingPlayers.join(", ")}` : `Faltan ${count} jugadoras.`;
@@ -189,9 +191,8 @@ exports.missingReportsNotifier = functions.pubsub
     return null;
   });
 
-
 // ============================================================================
-// 4. ALERTA RIESGO (Con Deduplicación)
+// 4. ALERTA RIESGO
 // ============================================================================
 exports.checkWellnessRisk = functions.firestore
   .document("wellness_logs/{docId}")
@@ -212,7 +213,6 @@ exports.checkWellnessRisk = functions.firestore
 
     if (staffTokens.length === 0) return null;
 
-    // [DEDUPLICACIÓN]
     const uniqueStaff = [...new Set(staffTokens)];
     
     let title = isRisk ? "⚠️ Alerta de Wellness" : "📝 Nueva Nota";
