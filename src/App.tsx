@@ -44,21 +44,24 @@ export default function App() {
     }
   }, []);
 
+  // [CORREGIDO] Gestión correcta del listener para evitar duplicados
   useEffect(() => {
-    const listenToNotifications = async () => {
-        try {
-            const payload = await onMessageListener();
-            if (payload.notification) {
-                toast(payload.notification.title, {
-                    description: payload.notification.body,
-                    duration: 5000,
-                });
-            }
-        } catch (err) {
-            console.log("Esperando notificaciones...", err);
+    // Iniciamos la escucha y guardamos la función de "desuscripción"
+    const unsubscribe = onMessageListener((payload) => {
+        // Solo mostramos el toast si hay notificación visual
+        if (payload.notification) {
+            toast(payload.notification.title, {
+                description: payload.notification.body,
+                duration: 5000,
+            });
         }
+    });
+
+    // Esta función se ejecuta al desmontar el componente o volver a ejecutar el efecto
+    // Es la clave para que no se acumulen listeners
+    return () => {
+        if (unsubscribe) unsubscribe();
     };
-    listenToNotifications();
   }, []);
 
   const checkDailyStatus = async (playerName: string) => {
@@ -187,11 +190,10 @@ export default function App() {
     );
   }
 
-  // --- LOGICA RESPONSIVA AQUÍ ---
-  // Si es staff, usamos layout completo. Si es jugador, mantenemos max-w-md (movil).
+  // --- LOGICA RESPONSIVA ---
   const layoutClass = userRole === 'staff' 
-    ? "min-h-screen bg-[#F8FAFC]" // Staff: Pantalla completa
-    : "max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]"; // Player: Móvil centrado
+    ? "min-h-screen bg-[#F8FAFC]" 
+    : "max-w-md mx-auto relative min-h-screen bg-[#F8FAFC]";
 
   if (userRole === 'staff') {
     return (
@@ -205,8 +207,6 @@ export default function App() {
   return (
     <div className={layoutClass}>
       <Toaster position="top-center" />
-
-      {/* PANTALLAS */}
 
       {currentScreen === 'player-home' && (
         <PlayerHome
